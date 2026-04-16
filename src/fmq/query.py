@@ -136,9 +136,7 @@ class Query:
         ids: list[PacketId] = sorted(self.workspace.packets)
         for stage in self._stages:
             if isinstance(stage, FilterStage):
-                ids = [
-                    pid for pid in ids if _eval(stage.expr, self.workspace.packets[pid])
-                ]
+                ids = [pid for pid in ids if _eval(stage.expr, self.workspace.packets[pid])]
             elif isinstance(stage, SearchStage):
                 from fmq.search import iter_search
 

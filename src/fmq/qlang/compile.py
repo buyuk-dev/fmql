@@ -9,7 +9,7 @@ from lark.exceptions import LarkError, VisitError
 from fmq.dates import is_sentinel, resolve_sentinel
 from fmq.errors import QueryError
 from fmq.filters import Predicate
-from fmq.query import AndNode, ExprNode, NotNode, OrNode, PredNode, Query
+from fmq.query import AndNode, NotNode, OrNode, PredNode, Query
 from fmq.workspace import Workspace
 
 _GRAMMAR_PATH = Path(__file__).with_name("grammar.lark")
@@ -121,8 +121,7 @@ class _Compiler(Transformer):
         if is_sentinel(name):
             return resolve_sentinel(name)
         raise QueryError(
-            f"unexpected bare identifier as value: {name!r}. "
-            "String values must be quoted."
+            f"unexpected bare identifier as value: {name!r}. " "String values must be quoted."
         )
 
 

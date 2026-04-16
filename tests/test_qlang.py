@@ -42,9 +42,7 @@ def test_ne(project_pm_ws):
 
 def test_and(project_pm_ws):
     q = compile_query('status = "active" AND priority > 2', project_pm_ws)
-    expected = _ids(
-        Query(project_pm_ws).where(status="active", priority__gt=2)
-    )
+    expected = _ids(Query(project_pm_ws).where(status="active", priority__gt=2))
     assert _ids(q) == expected
 
 
@@ -61,17 +59,13 @@ def test_or(project_pm_ws):
 def test_not(project_pm_ws):
     q = compile_query('NOT status = "done"', project_pm_ws)
     not_done = {
-        pid
-        for pid, p in project_pm_ws.packets.items()
-        if p.frontmatter.get("status") != "done"
+        pid for pid, p in project_pm_ws.packets.items() if p.frontmatter.get("status") != "done"
     }
     assert _ids(q) == not_done
 
 
 def test_parens(project_pm_ws):
-    q = compile_query(
-        '(status = "active" OR status = "done") AND priority > 1', project_pm_ws
-    )
+    q = compile_query('(status = "active" OR status = "done") AND priority > 1', project_pm_ws)
     expected = set()
     for pid, p in project_pm_ws.packets.items():
         s = p.frontmatter.get("status")
@@ -95,7 +89,10 @@ def test_is_empty(project_pm_ws):
     q = compile_query("blocked_by IS EMPTY", project_pm_ws)
     for pid in _ids(q):
         p = project_pm_ws.packets[pid]
-        assert p.frontmatter.get("blocked_by") in (None, "", [], {}) or "blocked_by" not in p.frontmatter
+        assert (
+            p.frontmatter.get("blocked_by") in (None, "", [], {})
+            or "blocked_by" not in p.frontmatter
+        )
 
 
 def test_is_not_empty(project_pm_ws):
@@ -126,10 +123,12 @@ def test_matches(project_pm_ws):
 
 
 def test_bool_literal(make_workspace):
-    ws = make_workspace({
-        "a.md": {"frontmatter": {"flag": True}},
-        "b.md": {"frontmatter": {"flag": False}},
-    })
+    ws = make_workspace(
+        {
+            "a.md": {"frontmatter": {"flag": True}},
+            "b.md": {"frontmatter": {"flag": False}},
+        }
+    )
     q = compile_query("flag = true", ws)
     assert _ids(q) == {"a.md"}
 
@@ -143,7 +142,8 @@ def test_today_sentinel(project_pm_ws):
     expected = {
         pid
         for pid, p in project_pm_ws.packets.items()
-        if isinstance(p.frontmatter.get("due_date"), date) and p.frontmatter.get("due_date") < today_d
+        if isinstance(p.frontmatter.get("due_date"), date)
+        and p.frontmatter.get("due_date") < today_d
     }
     assert _ids(q) == expected
 

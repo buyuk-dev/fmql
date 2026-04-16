@@ -118,8 +118,7 @@ def _apply_op(fm: CommentedMap, op: EditOp) -> Optional[str]:
             current = fm[field_name]
             if not isinstance(current, bool):
                 return (
-                    f"cannot toggle non-bool field {field_name!r} "
-                    f"(type: {_type_name(current)})"
+                    f"cannot toggle non-bool field {field_name!r} " f"(type: {_type_name(current)})"
                 )
             fm[field_name] = not current
         return None
@@ -225,19 +224,13 @@ class EditPlan:
 
     def summary(self) -> str:
         changes = self.compile()
-        changed = sum(
-            1 for c in changes if c.error is None and c.before != c.after
-        )
+        changed = sum(1 for c in changes if c.error is None and c.before != c.after)
         noop = sum(1 for c in changes if c.error is None and c.before == c.after)
         errored = sum(1 for c in changes if c.error is not None)
-        return (
-            f"{changed} changed, {errored} skipped (error), {noop} no-op"
-        )
+        return f"{changed} changed, {errored} skipped (error), {noop} no-op"
 
     def has_changes(self) -> bool:
-        return any(
-            c.error is None and c.before != c.after for c in self.compile()
-        )
+        return any(c.error is None and c.before != c.after for c in self.compile())
 
     def apply(
         self,
@@ -274,17 +267,13 @@ class EditPlan:
             tmp = c.abspath.with_suffix(c.abspath.suffix + ".tmp")
             tmp.write_text(c.after, encoding="utf-8", newline="")
             os.replace(tmp, c.abspath)
-            self.workspace.packets[c.packet_id] = parse_file(
-                c.abspath, pid=c.packet_id
-            )
+            self.workspace.packets[c.packet_id] = parse_file(c.abspath, pid=c.packet_id)
             report.written.append(c.packet_id)
 
         return report
 
 
-def _coerce_targets(
-    ws: "Workspace", targets: Iterable[PacketId | str]
-) -> list[PacketId]:
+def _coerce_targets(ws: "Workspace", targets: Iterable[PacketId | str]) -> list[PacketId]:
     result: list[PacketId] = []
     for t in targets:
         if t not in ws.packets:
@@ -293,48 +282,33 @@ def _coerce_targets(
     return result
 
 
-def plan_set(
-    ws: "Workspace", targets: Iterable[PacketId], **assignments: Any
-) -> EditPlan:
+def plan_set(ws: "Workspace", targets: Iterable[PacketId], **assignments: Any) -> EditPlan:
     if not assignments:
         raise EditError("set requires at least one field=value assignment")
     pids = _coerce_targets(ws, targets)
     ops = [
-        EditOp(packet_id=pid, kind="set", args={"assignments": dict(assignments)})
-        for pid in pids
+        EditOp(packet_id=pid, kind="set", args={"assignments": dict(assignments)}) for pid in pids
     ]
     return EditPlan(workspace=ws, ops=ops)
 
 
-def plan_remove(
-    ws: "Workspace", targets: Iterable[PacketId], *fields: str
-) -> EditPlan:
+def plan_remove(ws: "Workspace", targets: Iterable[PacketId], *fields: str) -> EditPlan:
     if not fields:
         raise EditError("remove requires at least one field name")
     pids = _coerce_targets(ws, targets)
-    ops = [
-        EditOp(packet_id=pid, kind="remove", args={"fields": list(fields)})
-        for pid in pids
-    ]
+    ops = [EditOp(packet_id=pid, kind="remove", args={"fields": list(fields)}) for pid in pids]
     return EditPlan(workspace=ws, ops=ops)
 
 
-def plan_rename(
-    ws: "Workspace", targets: Iterable[PacketId], **mapping: str
-) -> EditPlan:
+def plan_rename(ws: "Workspace", targets: Iterable[PacketId], **mapping: str) -> EditPlan:
     if not mapping:
         raise EditError("rename requires at least one old=new mapping")
     pids = _coerce_targets(ws, targets)
-    ops = [
-        EditOp(packet_id=pid, kind="rename", args={"mapping": dict(mapping)})
-        for pid in pids
-    ]
+    ops = [EditOp(packet_id=pid, kind="rename", args={"mapping": dict(mapping)}) for pid in pids]
     return EditPlan(workspace=ws, ops=ops)
 
 
-def plan_append(
-    ws: "Workspace", targets: Iterable[PacketId], **assignments: Any
-) -> EditPlan:
+def plan_append(ws: "Workspace", targets: Iterable[PacketId], **assignments: Any) -> EditPlan:
     if not assignments:
         raise EditError("append requires at least one field=value assignment")
     pids = _coerce_targets(ws, targets)
@@ -345,14 +319,9 @@ def plan_append(
     return EditPlan(workspace=ws, ops=ops)
 
 
-def plan_toggle(
-    ws: "Workspace", targets: Iterable[PacketId], *fields: str
-) -> EditPlan:
+def plan_toggle(ws: "Workspace", targets: Iterable[PacketId], *fields: str) -> EditPlan:
     if not fields:
         raise EditError("toggle requires at least one field name")
     pids = _coerce_targets(ws, targets)
-    ops = [
-        EditOp(packet_id=pid, kind="toggle", args={"fields": list(fields)})
-        for pid in pids
-    ]
+    ops = [EditOp(packet_id=pid, kind="toggle", args={"fields": list(fields)}) for pid in pids]
     return EditPlan(workspace=ws, ops=ops)

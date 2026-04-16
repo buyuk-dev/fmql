@@ -14,9 +14,7 @@ def _ws(tmp_path: Path) -> Path:
         "---\nstatus: active\npriority: 3\ntags:\n  - x\nflagged: false\n---\nbody a\n",
         encoding="utf-8",
     )
-    (root / "b.md").write_text(
-        "---\nstatus: done\npriority: 1\n---\nbody b\n", encoding="utf-8"
-    )
+    (root / "b.md").write_text("---\nstatus: done\npriority: 1\n---\nbody b\n", encoding="utf-8")
     return root
 
 
@@ -117,9 +115,7 @@ def test_remove_absent_is_noop(tmp_path: Path) -> None:
 def test_rename_field(tmp_path: Path) -> None:
     root = _ws(tmp_path)
     runner = CliRunner()
-    result = runner.invoke(
-        app, ["rename", str(root / "a.md"), "status=state", "--yes"]
-    )
+    result = runner.invoke(app, ["rename", str(root / "a.md"), "status=state", "--yes"])
     assert result.exit_code == 0, result.output
     text = (root / "a.md").read_text()
     assert "state: active" in text
@@ -129,9 +125,7 @@ def test_rename_field(tmp_path: Path) -> None:
 def test_rename_collision_errors(tmp_path: Path) -> None:
     root = _ws(tmp_path)
     runner = CliRunner()
-    result = runner.invoke(
-        app, ["rename", str(root / "a.md"), "status=priority", "--yes"]
-    )
+    result = runner.invoke(app, ["rename", str(root / "a.md"), "status=priority", "--yes"])
     # Collision → plan applies the one that succeeds, errors reported, exit 1.
     assert result.exit_code == 1
     assert "already exists" in result.stderr
@@ -236,7 +230,7 @@ def test_set_stdin_dash_token_explicit(tmp_path: Path) -> None:
 
 
 def test_jsonl_without_workspace_errors(tmp_path: Path) -> None:
-    root = _ws(tmp_path)
+    _ws(tmp_path)
     runner = CliRunner()
     inp = '{"id": "a.md"}\n'
     result = runner.invoke(app, ["set", "status=x", "--yes"], input=inp)

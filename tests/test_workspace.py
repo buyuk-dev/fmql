@@ -8,17 +8,21 @@ from fmq.workspace import Workspace
 
 
 def test_scans_all_md(make_workspace):
-    ws = make_workspace({
-        "a.md": {"frontmatter": {"x": 1}},
-        "sub/b.md": {"frontmatter": {"y": 2}},
-    })
+    ws = make_workspace(
+        {
+            "a.md": {"frontmatter": {"x": 1}},
+            "sub/b.md": {"frontmatter": {"y": 2}},
+        }
+    )
     assert set(ws.packets.keys()) == {"a.md", "sub/b.md"}
 
 
 def test_packet_id_is_posix_relative(make_workspace):
-    ws = make_workspace({
-        "nested/dir/deep.md": {"frontmatter": {"x": 1}},
-    })
+    ws = make_workspace(
+        {
+            "nested/dir/deep.md": {"frontmatter": {"x": 1}},
+        }
+    )
     assert "nested/dir/deep.md" in ws.packets
 
 
@@ -39,9 +43,11 @@ def test_bad_yaml_skipped_with_warning(tmp_path: Path):
 
 
 def test_no_frontmatter_file_still_indexed(make_workspace):
-    ws = make_workspace({
-        "plain.md": {"frontmatter": None, "body": "hi\n"},
-    })
+    ws = make_workspace(
+        {
+            "plain.md": {"frontmatter": None, "body": "hi\n"},
+        }
+    )
     assert "plain.md" in ws.packets
     assert ws.packets["plain.md"].has_frontmatter is False
 

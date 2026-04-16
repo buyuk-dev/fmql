@@ -44,9 +44,7 @@ def _load_yaml(text: str) -> CommentedMap:
     if data is None:
         return CommentedMap()
     if not isinstance(data, CommentedMap):
-        raise ParseError(
-            f"frontmatter must be a YAML mapping, got {type(data).__name__}"
-        )
+        raise ParseError(f"frontmatter must be a YAML mapping, got {type(data).__name__}")
     return data
 
 
@@ -134,15 +132,7 @@ def serialize_packet(
         body_out = b
         if not packet.has_frontmatter and body_out.startswith(FENCE + eol):
             body_out = eol + body_out
-        out = (
-            packet.raw_prefix
-            + FENCE
-            + eol
-            + yaml_text
-            + FENCE
-            + eol
-            + body_out
-        )
+        out = packet.raw_prefix + FENCE + eol + yaml_text + FENCE + eol + body_out
 
     if packet.newline_at_eof:
         if not out.endswith(eol):

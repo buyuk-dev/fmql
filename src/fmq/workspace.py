@@ -34,9 +34,7 @@ class Workspace:
         self.default_resolver: Resolver = default_resolver
         self._field_index: dict[str, dict[Any, list[PacketId]]] = {}
         self._stem_index: Optional[dict[str, list[PacketId]]] = None
-        self._reverse_cache: dict[
-            tuple[str, int], dict[PacketId, list[PacketId]]
-        ] = {}
+        self._reverse_cache: dict[tuple[str, int], dict[PacketId, list[PacketId]]] = {}
         self._scan()
 
     def _scan(self) -> None:
@@ -110,9 +108,7 @@ class Workspace:
         self._stem_index = idx
         return idx
 
-    def reverse_index(
-        self, field: str, resolver: Resolver
-    ) -> dict[PacketId, list[PacketId]]:
+    def reverse_index(self, field: str, resolver: Resolver) -> dict[PacketId, list[PacketId]]:
         """Lazy reverse adjacency: {target_pid: [source_pids]} for `field` via `resolver`."""
         key = (field, id(resolver))
         cached = self._reverse_cache.get(key)

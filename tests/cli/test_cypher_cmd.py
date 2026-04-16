@@ -27,9 +27,7 @@ def test_cypher_rows_single_hop(tmp_path: Path):
         ],
     )
     assert result.exit_code == 0, result.output
-    rows = sorted(
-        tuple(l.split("\t")) for l in result.stdout.splitlines() if l.strip()
-    )
+    rows = sorted(tuple(ln.split("\t")) for ln in result.stdout.splitlines() if ln.strip())
     assert rows == [
         ("a.md", "b.md"),
         ("b.md", "c.md"),
@@ -49,7 +47,7 @@ def test_cypher_self_cycle(tmp_path: Path):
         ],
     )
     assert result.exit_code == 0, result.output
-    lines = sorted(l for l in result.stdout.splitlines() if l.strip())
+    lines = sorted(ln for ln in result.stdout.splitlines() if ln.strip())
     assert lines == ["a.md", "b.md", "c.md"]
 
 
@@ -82,7 +80,7 @@ def test_cypher_json_format(tmp_path: Path):
         ],
     )
     assert result.exit_code == 0, result.output
-    rows = [json.loads(l) for l in result.stdout.splitlines() if l.strip()]
+    rows = [json.loads(ln) for ln in result.stdout.splitlines() if ln.strip()]
     assert len(rows) == 3
     for row in rows:
         assert row["columns"] == ["a", "b"]

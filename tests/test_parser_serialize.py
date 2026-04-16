@@ -13,7 +13,9 @@ def _fixture_files() -> list[Path]:
     return sorted(FIXTURE_ROOT.rglob("*.md"))
 
 
-@pytest.mark.parametrize("path", _fixture_files(), ids=lambda p: p.relative_to(FIXTURE_ROOT).as_posix())
+@pytest.mark.parametrize(
+    "path", _fixture_files(), ids=lambda p: p.relative_to(FIXTURE_ROOT).as_posix()
+)
 def test_roundtrip_byte_exact_fixture(path: Path) -> None:
     with open(path, "r", encoding="utf-8", newline="") as f:
         original = f.read()

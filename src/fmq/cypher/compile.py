@@ -67,9 +67,7 @@ def _check_unsupported(text: str) -> None:
             f"aggregation function {m.group(1)}() is not supported; only count() is"
         )
     if _REVERSE_REL_RE.search(text):
-        raise CypherUnsupported(
-            "reverse-direction relationships (<-[...]-) are not supported"
-        )
+        raise CypherUnsupported("reverse-direction relationships (<-[...]-) are not supported")
     if re.search(r"MATCH\s*\([^)]*\)[^\[]*,\s*\(", text):
         raise CypherUnsupported("multi-pattern MATCH (comma-joined patterns) is not supported")
 
@@ -254,8 +252,7 @@ class _Compiler(Transformer):
         if is_sentinel(name):
             return resolve_sentinel(name)
         raise CypherError(
-            f"unexpected bare identifier as value: {name!r}. "
-            "String values must be quoted."
+            f"unexpected bare identifier as value: {name!r}. " "String values must be quoted."
         )
 
 

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import pytest
+
 from fmq.edits import plan_append, plan_remove, plan_rename, plan_set, plan_toggle
 from fmq.errors import EditError
-import pytest
 
 
 def test_plan_set_basic_preview(project_pm_ws) -> None:
@@ -95,9 +96,7 @@ def test_plan_remove_absent_is_noop(project_pm_ws) -> None:
 def test_plan_partial_failure_isolation(project_pm_ws) -> None:
     # task-1 has priority: int; epic-1 has priority: str.
     # Append on both: task-1 creates list[int]; epic-1 fails (scalar str).
-    plan = plan_append(
-        project_pm_ws, ["tasks/task-1.md", "epics/epic-1.md"], priority=9
-    )
+    plan = plan_append(project_pm_ws, ["tasks/task-1.md", "epics/epic-1.md"], priority=9)
     report = plan.apply(confirm=False)
     # Wait — task-1 also has priority as int, so it's also scalar. Both fail.
     # Use tags instead.

@@ -22,9 +22,7 @@ def describe_cmd(
     fmt: DescribeFormat = typer.Option(
         DescribeFormat.text, "--format", "-f", help="Output format: text | json."
     ),
-    top_n: int = typer.Option(
-        5, "--top", help="Max distinct values to show per field."
-    ),
+    top_n: int = typer.Option(5, "--top", help="Max distinct values to show per field."),
 ) -> None:
     try:
         ws = Workspace(path)

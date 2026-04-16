@@ -45,15 +45,23 @@ def _parse_depth(depth: str) -> Union[int, str]:
 
 
 def query_cmd(
-    path: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True, resolve_path=True),
+    path: Path = typer.Argument(
+        ..., exists=True, file_okay=False, dir_okay=True, resolve_path=True
+    ),
     query: str = typer.Argument(..., help="qlang expression or '*' for all"),
     fmt: OutputFormat = typer.Option(OutputFormat.paths, "--format", "-f", help="Output format."),
     follow: Optional[str] = typer.Option(None, "--follow", help="Field name to traverse."),
     depth: str = typer.Option("1", "--depth", help="Hops to traverse: integer or '*' (or 'all')."),
     direction: Direction = typer.Option(Direction.forward, "--direction", help="forward | reverse"),
-    resolver: Optional[str] = typer.Option(None, "--resolver", help="path | uuid | slug (default: path)."),
-    include_origin: bool = typer.Option(False, "--include-origin", help="Include origin packets in output."),
-    search: Optional[str] = typer.Option(None, "--search", help="Narrow results to packets matching this search query."),
+    resolver: Optional[str] = typer.Option(
+        None, "--resolver", help="path | uuid | slug (default: path)."
+    ),
+    include_origin: bool = typer.Option(
+        False, "--include-origin", help="Include origin packets in output."
+    ),
+    search: Optional[str] = typer.Option(
+        None, "--search", help="Narrow results to packets matching this search query."
+    ),
     index: str = typer.Option("text", "--index", help="Search index name (default: text)."),
 ) -> None:
     try:

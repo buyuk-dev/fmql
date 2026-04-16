@@ -59,8 +59,7 @@ def test_parse_label_is_ignored():
 
 def test_parse_where_and_return_forms():
     ast = parse_cypher(
-        'MATCH (a)-[:f]->(b) WHERE a.status = "active" AND a.priority > 2 '
-        "RETURN a, a.status, b"
+        'MATCH (a)-[:f]->(b) WHERE a.status = "active" AND a.priority > 2 ' "RETURN a, a.status, b"
     )
     assert ast.where is not None
     assert ast.returns == (ReturnVar("a"), ReturnField("a", "status"), ReturnVar("b"))
@@ -106,7 +105,7 @@ def test_multi_pattern_match_unsupported():
 
 def test_unquoted_string_value_raises():
     with pytest.raises(CypherError):
-        parse_cypher('MATCH (a)-[:f]->(b) WHERE a.status = bananas RETURN a')
+        parse_cypher("MATCH (a)-[:f]->(b) WHERE a.status = bananas RETURN a")
 
 
 # ---------- execution ----------
@@ -134,9 +133,7 @@ def test_exec_self_cycle(blocked_ws):
 
 def test_exec_var_length_range(blocked_ws):
     # Cycle a→b→c→a: from a, 2 hops → c; 3 hops → a. Range 2..3 yields {c, a}.
-    res = compile_cypher(
-        "MATCH (a)-[:blocked_by*2..3]->(b) RETURN a, b", blocked_ws
-    )
+    res = compile_cypher("MATCH (a)-[:blocked_by*2..3]->(b) RETURN a, b", blocked_ws)
     rows = _set_rows(res)
     # Each origin sees {origin_itself_via_3, hop2_target}
     assert ("a.md", "a.md") in rows
@@ -157,7 +154,7 @@ def test_exec_chain(blocked_ws):
 def test_exec_where_filters(project_pm_ws):
     project_pm_ws.resolvers["blocked_by"] = UuidResolver()
     res = compile_cypher(
-        'MATCH (a)-[:blocked_by]->(b) WHERE a.priority > 2 RETURN a',
+        "MATCH (a)-[:blocked_by]->(b) WHERE a.priority > 2 RETURN a",
         project_pm_ws,
     )
     # task-3 (priority=5) and task-4 (priority=2) both have blocked_by.
@@ -167,18 +164,14 @@ def test_exec_where_filters(project_pm_ws):
 
 def test_exec_return_field(project_pm_ws):
     project_pm_ws.resolvers["blocked_by"] = UuidResolver()
-    res = compile_cypher(
-        "MATCH (a)-[:blocked_by]->(b) RETURN a.uuid", project_pm_ws
-    )
+    res = compile_cypher("MATCH (a)-[:blocked_by]->(b) RETURN a.uuid", project_pm_ws)
     rows = _set_rows(res)
     assert ("task-3",) in rows
     assert ("task-4",) in rows
 
 
 def test_exec_count(blocked_ws):
-    res = compile_cypher(
-        "MATCH (a)-[:blocked_by]->(b) RETURN count(a)", blocked_ws
-    )
+    res = compile_cypher("MATCH (a)-[:blocked_by]->(b) RETURN count(a)", blocked_ws)
     assert res.is_scalar is True
     assert res.scalar == 3
     assert res.columns == ("count(a)",)

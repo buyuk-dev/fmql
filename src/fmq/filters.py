@@ -67,7 +67,12 @@ def _comparable(a: Any, b: Any) -> bool:
         return True
     if isinstance(a, datetime) and isinstance(b, datetime):
         return True
-    if isinstance(a, date) and isinstance(b, date) and not isinstance(a, datetime) and not isinstance(b, datetime):
+    if (
+        isinstance(a, date)
+        and isinstance(b, date)
+        and not isinstance(a, datetime)
+        and not isinstance(b, datetime)
+    ):
         return True
     if isinstance(a, str) and isinstance(b, str):
         return True

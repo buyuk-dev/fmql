@@ -38,9 +38,7 @@ def _is_scalar(value: Any) -> bool:
 
 def describe(ws: Workspace, *, top_n: int = 5) -> WorkspaceStats:
     packet_count = len(ws.packets)
-    files_without_frontmatter = sum(
-        1 for p in ws.packets.values() if not p.has_frontmatter
-    )
+    files_without_frontmatter = sum(1 for p in ws.packets.values() if not p.has_frontmatter)
 
     present: Counter[str] = Counter()
     types: dict[str, Counter[str]] = {}
@@ -125,14 +123,10 @@ def format_text(stats: WorkspaceStats) -> str:
         types_str = "{" + ", ".join(f"{k}: {v}" for k, v in s.types.items()) + "}"
         parts = [f"  {s.name.ljust(name_width)}  present={s.present_in}  types={types_str}"]
         if s.numeric_min is not None:
-            parts.append(
-                f"range=[{_fmt_number(s.numeric_min)}..{_fmt_number(s.numeric_max)}]"
-            )
+            parts.append(f"range=[{_fmt_number(s.numeric_min)}..{_fmt_number(s.numeric_max)}]")
             parts.append(f"avg={_fmt_number(s.numeric_avg)}")
         if s.date_min is not None:
-            parts.append(
-                f"range=[{s.date_min.isoformat()}..{s.date_max.isoformat()}]"
-            )
+            parts.append(f"range=[{s.date_min.isoformat()}..{s.date_max.isoformat()}]")
         if s.top_values:
             top = ", ".join(f"{_fmt_scalar(v)} ({n})" for v, n in s.top_values)
             parts.append(f"top: {top}")
@@ -160,9 +154,7 @@ def format_json(stats: WorkspaceStats) -> str:
                 "name": s.name,
                 "present_in": s.present_in,
                 "types": s.types,
-                "top_values": [
-                    {"value": v, "count": n} for v, n in s.top_values
-                ],
+                "top_values": [{"value": v, "count": n} for v, n in s.top_values],
                 "numeric_min": s.numeric_min,
                 "numeric_max": s.numeric_max,
                 "numeric_avg": s.numeric_avg,

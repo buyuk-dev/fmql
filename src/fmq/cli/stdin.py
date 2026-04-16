@@ -9,8 +9,8 @@ from typing import Optional, TextIO
 @dataclass
 class StdinResult:
     mode: str  # "paths" | "jsonl" | "empty"
-    raw_paths: list[str]       # verbatim strings (unresolved) when mode="paths"
-    pids: list[str]            # when mode="jsonl"
+    raw_paths: list[str]  # verbatim strings (unresolved) when mode="paths"
+    pids: list[str]  # when mode="jsonl"
 
 
 def read_stdin_targets(*, stream: Optional[TextIO] = None) -> StdinResult:

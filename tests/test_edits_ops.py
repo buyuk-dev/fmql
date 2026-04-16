@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 
 from ruamel.yaml import YAML
-from ruamel.yaml.comments import CommentedMap, CommentedSeq
+from ruamel.yaml.comments import CommentedMap
 
 from fmq.edits import EditOp, _apply_ops_to_map
 

@@ -37,10 +37,7 @@ def test_relative_path_resolver_non_string(paths_refs_ws):
 
 def test_relative_path_resolver_outside_workspace(paths_refs_ws):
     r = RelativePathResolver()
-    assert (
-        r.resolve("../../etc/passwd", origin="tasks/a.md", workspace=paths_refs_ws)
-        is None
-    )
+    assert r.resolve("../../etc/passwd", origin="tasks/a.md", workspace=paths_refs_ws) is None
 
 
 def test_uuid_resolver_hit(project_pm_ws):

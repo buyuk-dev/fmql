@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from fmq.edits import plan_append, plan_remove, plan_rename, plan_set, plan_toggle
 from fmq.workspace import Workspace
 
@@ -38,8 +36,7 @@ def test_set_preserves_body_bytes_on_fixture(tmp_path: Path) -> None:
     plan_set(ws, ["x.md"], status="escalated").apply(confirm=False)
     result = _read(tmp_path, "x.md")
     assert (
-        result
-        == "---\n"
+        result == "---\n"
         "uuid: task-x\n"
         "status: escalated\n"
         "tags:\n"
@@ -71,7 +68,7 @@ def test_set_preserves_comments(tmp_path: Path) -> None:
 
 
 def test_set_preserves_quoted_numeric_string(tmp_path: Path) -> None:
-    text = "---\npriority: \"42\"\nstatus: active\n---\nbody\n"
+    text = '---\npriority: "42"\nstatus: active\n---\nbody\n'
     _write(tmp_path, "x.md", text)
     ws = Workspace(tmp_path)
     plan_set(ws, ["x.md"], status="escalated").apply(confirm=False)
@@ -99,27 +96,13 @@ def test_rename_preserves_inline_comment(tmp_path: Path) -> None:
 
 
 def test_remove_preserves_surrounding(tmp_path: Path) -> None:
-    text = (
-        "---\n"
-        "a: 1\n"
-        "b: 2\n"
-        "c: 3\n"
-        "---\n"
-        "Body with multiple lines.\n"
-        "And another.\n"
-    )
+    text = "---\n" "a: 1\n" "b: 2\n" "c: 3\n" "---\n" "Body with multiple lines.\n" "And another.\n"
     _write(tmp_path, "x.md", text)
     ws = Workspace(tmp_path)
     plan_remove(ws, ["x.md"], "b").apply(confirm=False)
     result = _read(tmp_path, "x.md")
     assert (
-        result
-        == "---\n"
-        "a: 1\n"
-        "c: 3\n"
-        "---\n"
-        "Body with multiple lines.\n"
-        "And another.\n"
+        result == "---\n" "a: 1\n" "c: 3\n" "---\n" "Body with multiple lines.\n" "And another.\n"
     )
 
 
@@ -166,10 +149,7 @@ def test_crlf_preserved_under_edit(tmp_path: Path) -> None:
     ws = Workspace(tmp_path)
     plan_set(ws, ["x.md"], status="escalated").apply(confirm=False)
     result = _read(tmp_path, "x.md")
-    assert (
-        result
-        == "---\r\nstatus: escalated\r\ntags:\r\n  - a\r\n---\r\nbody\r\n"
-    )
+    assert result == "---\r\nstatus: escalated\r\ntags:\r\n  - a\r\n---\r\nbody\r\n"
 
 
 def test_unicode_values_preserved(tmp_path: Path) -> None:

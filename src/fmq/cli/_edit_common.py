@@ -89,9 +89,7 @@ def resolve_targets_and_workspace(
 
     if ws_root is None:
         if stdin_result is not None and stdin_result.mode == "jsonl":
-            raise EditError(
-                "JSONL stdin requires --workspace or a directory argument"
-            )
+            raise EditError("JSONL stdin requires --workspace or a directory argument")
         raise EditError("no workspace (pass --workspace or a directory argument)")
 
     ws = Workspace(ws_root)

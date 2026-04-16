@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "pytest-cov>=5"]
+dev = ["pytest>=8", "pytest-cov>=5", "black>=24", "ruff>=0.5"]
 
 [project.scripts]
 fmq = "fmq.cli.main:app"
@@ -28,3 +28,22 @@ packages = ["src/fmq"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+[tool.coverage.run]
+source = ["src/fmq"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false

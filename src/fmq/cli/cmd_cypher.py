@@ -38,7 +38,9 @@ def _format_cell(v):
 
 
 def cypher_cmd(
-    path: Path = typer.Argument(..., exists=True, file_okay=False, dir_okay=True, resolve_path=True),
+    path: Path = typer.Argument(
+        ..., exists=True, file_okay=False, dir_okay=True, resolve_path=True
+    ),
     query: str = typer.Argument(..., help="Cypher subset query (MATCH ... [WHERE ...] RETURN ...)"),
     fmt: CypherFormat = typer.Option(CypherFormat.rows, "--format", "-f", help="Output format."),
     resolver: Optional[str] = typer.Option(

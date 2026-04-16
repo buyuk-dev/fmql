@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
+
+from ruamel.yaml.comments import CommentedMap
 
 from fmq.filters import Predicate, match, parse_kwargs
 from fmq.packet import Packet
-from ruamel.yaml.comments import CommentedMap
-from pathlib import Path
 
 
 def _pkt(fm: dict) -> Packet:

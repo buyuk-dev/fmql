@@ -49,9 +49,7 @@ def get_or_create_text_index(workspace: Workspace) -> SearchIndex:
     return idx
 
 
-def iter_search(
-    workspace: Workspace, index_name: str, query: str
-) -> Iterable[PacketId]:
+def iter_search(workspace: Workspace, index_name: str, query: str) -> Iterable[PacketId]:
     if index_name == "text" and "text" not in workspace.search_indexes:
         get_or_create_text_index(workspace)
     index = workspace.search_indexes.get(index_name)

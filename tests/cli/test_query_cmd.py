@@ -25,22 +25,18 @@ def _write_ws(root: Path) -> None:
 def test_query_paths_format(tmp_path: Path):
     _write_ws(tmp_path)
     runner = CliRunner()
-    result = runner.invoke(
-        app, ["query", str(tmp_path), 'status = "active" AND priority > 2']
-    )
+    result = runner.invoke(app, ["query", str(tmp_path), 'status = "active" AND priority > 2'])
     assert result.exit_code == 0, result.output
-    lines = [l for l in result.stdout.splitlines() if l.strip()]
+    lines = [ln for ln in result.stdout.splitlines() if ln.strip()]
     assert lines == ["tasks/a.md"]
 
 
 def test_query_json_format(tmp_path: Path):
     _write_ws(tmp_path)
     runner = CliRunner()
-    result = runner.invoke(
-        app, ["query", str(tmp_path), "*", "--format", "json"]
-    )
+    result = runner.invoke(app, ["query", str(tmp_path), "*", "--format", "json"])
     assert result.exit_code == 0, result.output
-    rows = [json.loads(l) for l in result.stdout.splitlines() if l.strip()]
+    rows = [json.loads(ln) for ln in result.stdout.splitlines() if ln.strip()]
     assert len(rows) == 3
     ids = sorted(r["id"] for r in rows)
     assert ids == ["tasks/a.md", "tasks/b.md", "tasks/c.md"]
@@ -53,7 +49,7 @@ def test_query_star_prints_all(tmp_path: Path):
     runner = CliRunner()
     result = runner.invoke(app, ["query", str(tmp_path), "*"])
     assert result.exit_code == 0
-    lines = sorted(l for l in result.stdout.splitlines() if l.strip())
+    lines = sorted(ln for ln in result.stdout.splitlines() if ln.strip())
     assert lines == ["tasks/a.md", "tasks/b.md", "tasks/c.md"]
 
 
@@ -77,15 +73,9 @@ def test_version_cmd():
 def _write_blocked_ws(root: Path) -> None:
     """a (uuid=a) → b (uuid=b, blocked_by=a) → c (uuid=c, blocked_by=b)."""
     root.mkdir(parents=True, exist_ok=True)
-    (root / "a.md").write_text(
-        "---\nuuid: a\n---\nA\n", encoding="utf-8"
-    )
-    (root / "b.md").write_text(
-        "---\nuuid: b\nblocked_by: a\n---\nB\n", encoding="utf-8"
-    )
-    (root / "c.md").write_text(
-        "---\nuuid: c\nblocked_by: b\n---\nC\n", encoding="utf-8"
-    )
+    (root / "a.md").write_text("---\nuuid: a\n---\nA\n", encoding="utf-8")
+    (root / "b.md").write_text("---\nuuid: b\nblocked_by: a\n---\nB\n", encoding="utf-8")
+    (root / "c.md").write_text("---\nuuid: c\nblocked_by: b\n---\nC\n", encoding="utf-8")
 
 
 def test_query_follow_depth_1(tmp_path: Path):
@@ -94,14 +84,19 @@ def test_query_follow_depth_1(tmp_path: Path):
     result = runner.invoke(
         app,
         [
-            "query", str(tmp_path), 'uuid = "c"',
-            "--follow", "blocked_by",
-            "--depth", "1",
-            "--resolver", "uuid",
+            "query",
+            str(tmp_path),
+            'uuid = "c"',
+            "--follow",
+            "blocked_by",
+            "--depth",
+            "1",
+            "--resolver",
+            "uuid",
         ],
     )
     assert result.exit_code == 0, result.output
-    lines = [l for l in result.stdout.splitlines() if l.strip()]
+    lines = [ln for ln in result.stdout.splitlines() if ln.strip()]
     assert lines == ["b.md"]
 
 
@@ -111,14 +106,19 @@ def test_query_follow_depth_star(tmp_path: Path):
     result = runner.invoke(
         app,
         [
-            "query", str(tmp_path), 'uuid = "c"',
-            "--follow", "blocked_by",
-            "--depth", "*",
-            "--resolver", "uuid",
+            "query",
+            str(tmp_path),
+            'uuid = "c"',
+            "--follow",
+            "blocked_by",
+            "--depth",
+            "*",
+            "--resolver",
+            "uuid",
         ],
     )
     assert result.exit_code == 0, result.output
-    lines = sorted(l for l in result.stdout.splitlines() if l.strip())
+    lines = sorted(ln for ln in result.stdout.splitlines() if ln.strip())
     assert lines == ["a.md", "b.md"]
 
 
@@ -128,14 +128,19 @@ def test_query_follow_reverse(tmp_path: Path):
     result = runner.invoke(
         app,
         [
-            "query", str(tmp_path), 'uuid = "a"',
-            "--follow", "blocked_by",
-            "--direction", "reverse",
-            "--resolver", "uuid",
+            "query",
+            str(tmp_path),
+            'uuid = "a"',
+            "--follow",
+            "blocked_by",
+            "--direction",
+            "reverse",
+            "--resolver",
+            "uuid",
         ],
     )
     assert result.exit_code == 0, result.output
-    lines = [l for l in result.stdout.splitlines() if l.strip()]
+    lines = [ln for ln in result.stdout.splitlines() if ln.strip()]
     assert lines == ["b.md"]
 
 
@@ -145,15 +150,20 @@ def test_query_follow_include_origin(tmp_path: Path):
     result = runner.invoke(
         app,
         [
-            "query", str(tmp_path), 'uuid = "c"',
-            "--follow", "blocked_by",
-            "--depth", "*",
-            "--resolver", "uuid",
+            "query",
+            str(tmp_path),
+            'uuid = "c"',
+            "--follow",
+            "blocked_by",
+            "--depth",
+            "*",
+            "--resolver",
+            "uuid",
             "--include-origin",
         ],
     )
     assert result.exit_code == 0, result.output
-    lines = sorted(l for l in result.stdout.splitlines() if l.strip())
+    lines = sorted(ln for ln in result.stdout.splitlines() if ln.strip())
     assert lines == ["a.md", "b.md", "c.md"]
 
 
@@ -163,10 +173,15 @@ def test_query_follow_invalid_depth(tmp_path: Path):
     result = runner.invoke(
         app,
         [
-            "query", str(tmp_path), 'uuid = "c"',
-            "--follow", "blocked_by",
-            "--depth", "foo",
-            "--resolver", "uuid",
+            "query",
+            str(tmp_path),
+            'uuid = "c"',
+            "--follow",
+            "blocked_by",
+            "--depth",
+            "foo",
+            "--resolver",
+            "uuid",
         ],
     )
     assert result.exit_code == 2
@@ -179,11 +194,9 @@ def test_query_search_narrows(tmp_path: Path):
         encoding="utf-8",
     )
     runner = CliRunner()
-    result = runner.invoke(
-        app, ["query", str(tmp_path), "*", "--search", "banana"]
-    )
+    result = runner.invoke(app, ["query", str(tmp_path), "*", "--search", "banana"])
     assert result.exit_code == 0, result.output
-    lines = [l for l in result.stdout.splitlines() if l.strip()]
+    lines = [ln for ln in result.stdout.splitlines() if ln.strip()]
     assert lines == ["tasks/a.md"]
 
 
@@ -199,7 +212,7 @@ def test_query_search_explicit_text_index(tmp_path: Path):
         ["query", str(tmp_path), "*", "--search", "banana", "--index", "text"],
     )
     assert result.exit_code == 0, result.output
-    lines = [l for l in result.stdout.splitlines() if l.strip()]
+    lines = [ln for ln in result.stdout.splitlines() if ln.strip()]
     assert lines == ["tasks/a.md"]
 
 
@@ -235,7 +248,7 @@ def test_query_search_combines_with_filter(tmp_path: Path):
         ],
     )
     assert result.exit_code == 0, result.output
-    lines = [l for l in result.stdout.splitlines() if l.strip()]
+    lines = [ln for ln in result.stdout.splitlines() if ln.strip()]
     assert lines == ["tasks/a.md"]
 
 
@@ -246,10 +259,15 @@ def test_query_follow_pipe_to_append(tmp_path: Path):
     q_result = runner.invoke(
         app,
         [
-            "query", str(tmp_path), 'uuid = "c"',
-            "--follow", "blocked_by",
-            "--depth", "*",
-            "--resolver", "uuid",
+            "query",
+            str(tmp_path),
+            'uuid = "c"',
+            "--follow",
+            "blocked_by",
+            "--depth",
+            "*",
+            "--resolver",
+            "uuid",
             "--include-origin",
         ],
     )
@@ -260,8 +278,11 @@ def test_query_follow_pipe_to_append(tmp_path: Path):
     pipe_result = runner.invoke(
         app,
         [
-            "append", "-", "tags=blocked-chain",
-            "--workspace", str(tmp_path),
+            "append",
+            "-",
+            "tags=blocked-chain",
+            "--workspace",
+            str(tmp_path),
             "--dry-run",
         ],
         input=q_result.stdout,

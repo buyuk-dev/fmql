@@ -48,9 +48,7 @@ def test_describe_json_format(tmp_path: Path):
 def test_describe_top_n(tmp_path: Path):
     _write_ws(tmp_path)
     runner = CliRunner()
-    result = runner.invoke(
-        app, ["describe", str(tmp_path), "--format", "json", "--top", "1"]
-    )
+    result = runner.invoke(app, ["describe", str(tmp_path), "--format", "json", "--top", "1"])
     assert result.exit_code == 0, result.output
     payload = json.loads(result.stdout)
     status = next(f for f in payload["fields"] if f["name"] == "status")

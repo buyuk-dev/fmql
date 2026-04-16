@@ -9,17 +9,13 @@ from fmq.traversal import follow
 
 def test_forward_depth_1(project_pm_ws):
     r = UuidResolver()
-    result = follow(
-        project_pm_ws, ["tasks/task-3.md"], field="blocked_by", depth=1, resolver=r
-    )
+    result = follow(project_pm_ws, ["tasks/task-3.md"], field="blocked_by", depth=1, resolver=r)
     assert result == ["tasks/task-1.md"]
 
 
 def test_forward_list_values(project_pm_ws):
     r = UuidResolver()
-    result = follow(
-        project_pm_ws, ["tasks/task-4.md"], field="blocked_by", depth=1, resolver=r
-    )
+    result = follow(project_pm_ws, ["tasks/task-4.md"], field="blocked_by", depth=1, resolver=r)
     assert result == ["tasks/task-1.md", "tasks/task-2.md"]
 
 
@@ -52,9 +48,7 @@ def test_include_origin_true(cycles_ws):
 
 def test_include_origin_false_default(project_pm_ws):
     r = UuidResolver()
-    result = follow(
-        project_pm_ws, ["tasks/task-3.md"], field="blocked_by", depth=1, resolver=r
-    )
+    result = follow(project_pm_ws, ["tasks/task-3.md"], field="blocked_by", depth=1, resolver=r)
     assert "tasks/task-3.md" not in result
 
 
@@ -101,9 +95,7 @@ def test_unresolvable_value_dropped(make_workspace):
 def test_missing_field_empty(project_pm_ws):
     r = UuidResolver()
     # task-1 has no blocked_by field.
-    result = follow(
-        project_pm_ws, ["tasks/task-1.md"], field="blocked_by", depth=1, resolver=r
-    )
+    result = follow(project_pm_ws, ["tasks/task-1.md"], field="blocked_by", depth=1, resolver=r)
     assert result == []
 
 

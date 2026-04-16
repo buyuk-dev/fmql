@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from typing import Any, Optional
+from typing import Any
 
 from fmq.cypher.ast import (
     CypherAST,
@@ -49,9 +49,7 @@ def _check_where_vars(expr: ExprNode, declared: set[str]) -> None:
     if isinstance(expr, PredNode):
         field = expr.predicate.field
         if "." not in field:
-            raise CypherError(
-                f"WHERE predicate {field!r} must be qualified as <var>.<field>"
-            )
+            raise CypherError(f"WHERE predicate {field!r} must be qualified as <var>.<field>")
         var = field.split(".", 1)[0]
         if var not in declared:
             raise CypherError(f"WHERE references undeclared variable {var!r}")
@@ -85,9 +83,7 @@ def _enumerate(workspace: Workspace, pattern: Pattern) -> list[Binding]:
 
 
 def _reachable(workspace: Workspace, src: PacketId, rel: RelHop) -> set[PacketId]:
-    resolver: Resolver = (
-        workspace.resolvers.get(rel.field) or workspace.default_resolver
-    )
+    resolver: Resolver = workspace.resolvers.get(rel.field) or workspace.default_resolver
     if rel.min_hops == 1 and rel.max_hops == 1:
         return set(_neighbors(workspace, src, rel.field, resolver))
 
