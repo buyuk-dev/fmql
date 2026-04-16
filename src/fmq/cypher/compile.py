@@ -206,7 +206,7 @@ class _Compiler(Transformer):
 
     @v_args(inline=True)
     def p_binop(self, qident, op, value):
-        op_name = _OP_MAP[op]
+        op_name = _OP_MAP[op.upper()] if op.isalpha() else _OP_MAP[op]
         return PredNode(Predicate(field=str(qident), op=op_name, value=value))
 
     def p_in(self, children):
@@ -240,7 +240,7 @@ class _Compiler(Transformer):
 
     @v_args(inline=True)
     def v_bool(self, tok):
-        return str(tok) == "true"
+        return str(tok).lower() == "true"
 
     @v_args(inline=True)
     def v_date_offset(self, tok):

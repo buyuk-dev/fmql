@@ -70,6 +70,13 @@ def test_parse_count_return():
     assert ast.returns == (ReturnCount("a"),)
 
 
+def test_parse_keywords_are_case_insensitive():
+    ast = parse_cypher('match (a)-[:f]->(b) where a.x contains "y" return count(a)')
+    assert [n.var for n in ast.pattern.nodes] == ["a", "b"]
+    assert ast.returns == (ReturnCount("a"),)
+    assert ast.where is not None
+
+
 @pytest.mark.parametrize(
     "txt",
     [

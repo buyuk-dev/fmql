@@ -49,21 +49,21 @@ value: ESCAPED_STRING   -> v_string
      | DATE_OFFSET      -> v_date_offset
      | IDENT            -> v_ident
 
-MATCH_KW.5: "MATCH"
-WHERE_KW.5: "WHERE"
-RETURN_KW.5: "RETURN"
-COUNT_KW.5: "count"
+MATCH_KW.5: "MATCH"i
+WHERE_KW.5: "WHERE"i
+RETURN_KW.5: "RETURN"i
+COUNT_KW.5: "count"i
 
-AND_KW.3: "AND"
-OR_KW.3: "OR"
-NOT_KW.3: "NOT"
-IN_KW.3: "IN"
-IS_KW.3: "IS"
-EMPTY_KW.3: "EMPTY"
-NULL_KW.3: "NULL"
-CONTAINS_KW.3: "CONTAINS"
-MATCHES_KW.3: "MATCHES"
-BOOL_KW.3: "true" | "false"
+AND_KW.3: "AND"i
+OR_KW.3: "OR"i
+NOT_KW.3: "NOT"i
+IN_KW.3: "IN"i
+IS_KW.3: "IS"i
+EMPTY_KW.3: "EMPTY"i
+NULL_KW.3: "NULL"i
+CONTAINS_KW.3: "CONTAINS"i
+MATCHES_KW.3: "MATCHES"i
+BOOL_KW.3: "true"i | "false"i
 DATE_OFFSET.3: /(today|now|yesterday|tomorrow)[+-]\d+[smhdw]/
 
 COMMA: ","

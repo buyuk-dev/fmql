@@ -122,6 +122,14 @@ def test_matches(project_pm_ws):
     }
 
 
+def test_keywords_are_case_insensitive(project_pm_ws):
+    upper = _ids(compile_query('status = "active" AND priority > 2', project_pm_ws))
+    lower = _ids(compile_query('status = "active" and priority > 2', project_pm_ws))
+    mixed = _ids(compile_query('tags Contains "urgent"', project_pm_ws))
+    assert lower == upper
+    assert mixed == {"tasks/task-3.md"}
+
+
 def test_bool_literal(make_workspace):
     ws = make_workspace(
         {
