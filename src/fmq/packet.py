@@ -24,6 +24,11 @@ class Packet:
     def as_plain(self) -> dict[str, Any]:
         return _to_plain(self.frontmatter)
 
+    def serialize(self) -> str:
+        from fmq.parser import serialize_packet
+
+        return serialize_packet(self)
+
 
 def _to_plain(value: Any) -> Any:
     if isinstance(value, CommentedMap) or isinstance(value, dict):

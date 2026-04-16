@@ -12,3 +12,7 @@ class QueryError(FmqError):
 
 class FilterError(QueryError):
     pass
+
+
+class EditError(FmqError):
+    pass

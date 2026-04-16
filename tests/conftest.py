@@ -11,6 +11,7 @@ from fmq.workspace import Workspace
 
 _YAML = YAML(typ="rt", pure=True)
 _YAML.default_flow_style = False
+_YAML.indent(mapping=2, sequence=4, offset=2)
 
 
 def _dump_yaml(data: dict[str, Any]) -> str:

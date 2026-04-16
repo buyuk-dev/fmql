@@ -1,0 +1,28 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Optional
+
+import typer
+
+from fmq.cli._coerce import split_assignments
+from fmq.cli._edit_common import cli_guard, resolve_targets_and_workspace, run_plan
+from fmq.edits import plan_rename
+from fmq.errors import EditError
+
+
+@cli_guard
+def rename_cmd(
+    args: list[str] = typer.Argument(None, help="Targets and old=new pairs"),
+    workspace: Optional[Path] = typer.Option(None, "--workspace", "-w"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+    yes: bool = typer.Option(False, "--yes"),
+) -> int:
+    args = args or []
+    targets, raw_assigns = split_assignments(args)
+    if not raw_assigns:
+        raise EditError("no mappings (expected old=new)")
+    ws, pids = resolve_targets_and_workspace(targets, workspace_flag=workspace)
+    mapping = {k: v for k, v in raw_assigns}
+    plan = plan_rename(ws, pids, **mapping)
+    return run_plan(plan, dry_run=dry_run, yes=yes)

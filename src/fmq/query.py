@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Iterator, Union
+from typing import TYPE_CHECKING, Any, Iterator, Union
 
 from fmq.filters import Predicate, match, parse_kwargs
 from fmq.packet import Packet
 from fmq.types import PacketId
 from fmq.workspace import Workspace
+
+if TYPE_CHECKING:
+    from fmq.edits import EditPlan
 
 
 @dataclass(frozen=True)
@@ -74,3 +77,28 @@ class Query:
 
     def ids(self) -> list[PacketId]:
         return [p.id for p in self]
+
+    def set(self, **assignments: Any) -> "EditPlan":
+        from fmq.edits import plan_set
+
+        return plan_set(self.workspace, self.ids(), **assignments)
+
+    def remove(self, *fields: str) -> "EditPlan":
+        from fmq.edits import plan_remove
+
+        return plan_remove(self.workspace, self.ids(), *fields)
+
+    def rename(self, **mapping: str) -> "EditPlan":
+        from fmq.edits import plan_rename
+
+        return plan_rename(self.workspace, self.ids(), **mapping)
+
+    def append(self, **assignments: Any) -> "EditPlan":
+        from fmq.edits import plan_append
+
+        return plan_append(self.workspace, self.ids(), **assignments)
+
+    def toggle(self, *fields: str) -> "EditPlan":
+        from fmq.edits import plan_toggle
+
+        return plan_toggle(self.workspace, self.ids(), *fields)

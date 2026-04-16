@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import re
 from pathlib import Path
+from typing import Optional
 
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
@@ -20,6 +21,7 @@ def _make_yaml() -> YAML:
     yaml = YAML(typ="rt", pure=True)
     yaml.preserve_quotes = True
     yaml.width = 10_000
+    yaml.indent(mapping=2, sequence=4, offset=2)
     return yaml
 
 
@@ -102,3 +104,51 @@ def dump_yaml(data: CommentedMap) -> str:
     buf = io.StringIO()
     _YAML.dump(data, buf)
     return buf.getvalue()
+
+
+def serialize_packet(
+    packet: Packet,
+    *,
+    frontmatter: Optional[CommentedMap] = None,
+    body: Optional[str] = None,
+    force_frontmatter: Optional[bool] = None,
+) -> str:
+    fm = packet.frontmatter if frontmatter is None else frontmatter
+    b = packet.body if body is None else body
+    eol = packet.eol
+
+    if force_frontmatter is None:
+        emit_fm = len(fm) > 0 or packet.has_frontmatter
+    else:
+        emit_fm = force_frontmatter
+
+    if not emit_fm:
+        out = packet.raw_prefix + b
+    else:
+        if len(fm) == 0:
+            yaml_text = ""
+        else:
+            yaml_text = dump_yaml(fm)
+            if eol != "\n":
+                yaml_text = yaml_text.replace("\n", eol)
+        body_out = b
+        if not packet.has_frontmatter and body_out.startswith(FENCE + eol):
+            body_out = eol + body_out
+        out = (
+            packet.raw_prefix
+            + FENCE
+            + eol
+            + yaml_text
+            + FENCE
+            + eol
+            + body_out
+        )
+
+    if packet.newline_at_eof:
+        if not out.endswith(eol):
+            out += eol
+    else:
+        if out.endswith(eol):
+            out = out[: -len(eol)]
+
+    return out
