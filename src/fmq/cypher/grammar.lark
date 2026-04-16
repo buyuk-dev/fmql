@@ -1,0 +1,84 @@
+?start: cypher
+
+cypher: match_clause where_clause? return_clause
+
+match_clause: MATCH_KW pattern
+
+pattern: node (rel node)*
+
+node: "(" IDENT (":" IDENT)? ")"
+
+rel: "-" "[" ":" IDENT star_spec? "]" "->"
+
+star_spec: "*" range_spec?
+range_spec: INT ".." INT   -> range_both
+          | INT            -> range_max
+          | ".." INT       -> range_upper_only
+
+where_clause: WHERE_KW or_expr
+
+return_clause: RETURN_KW return_item (COMMA return_item)*
+
+return_item: COUNT_KW "(" IDENT ")"          -> r_count
+           | IDENT "." IDENT                 -> r_field
+           | IDENT                           -> r_var
+
+?or_expr: and_expr (OR_KW and_expr)+         -> or_list
+        | and_expr
+?and_expr: not_expr (AND_KW not_expr)+       -> and_list
+         | not_expr
+?not_expr: NOT_KW not_expr                   -> not_op
+         | atom
+
+?atom: "(" or_expr ")"
+     | predicate
+
+predicate: qualified_ident cmp_op value                              -> p_binop
+         | qualified_ident IN_KW "[" [value ("," value)*] "]"        -> p_in
+         | qualified_ident IS_KW NOT_KW EMPTY_KW                     -> p_not_empty
+         | qualified_ident IS_KW EMPTY_KW                            -> p_empty
+         | qualified_ident IS_KW NULL_KW                             -> p_null
+
+qualified_ident: IDENT "." IDENT
+
+cmp_op: EQ | NEQ | GTE | LTE | GT | LT | CONTAINS_KW | MATCHES_KW
+
+value: ESCAPED_STRING   -> v_string
+     | SIGNED_NUMBER    -> v_number
+     | BOOL_KW          -> v_bool
+     | DATE_OFFSET      -> v_date_offset
+     | IDENT            -> v_ident
+
+MATCH_KW.5: "MATCH"
+WHERE_KW.5: "WHERE"
+RETURN_KW.5: "RETURN"
+COUNT_KW.5: "count"
+
+AND_KW.3: "AND"
+OR_KW.3: "OR"
+NOT_KW.3: "NOT"
+IN_KW.3: "IN"
+IS_KW.3: "IS"
+EMPTY_KW.3: "EMPTY"
+NULL_KW.3: "NULL"
+CONTAINS_KW.3: "CONTAINS"
+MATCHES_KW.3: "MATCHES"
+BOOL_KW.3: "true" | "false"
+DATE_OFFSET.3: /(today|now|yesterday|tomorrow)[+-]\d+[smhdw]/
+
+COMMA: ","
+
+GTE: ">="
+LTE: "<="
+NEQ: "!="
+EQ: "="
+GT: ">"
+LT: "<"
+
+IDENT.1: /[A-Za-z_][A-Za-z0-9_]*/
+INT: /\d+/
+
+%import common.ESCAPED_STRING
+%import common.SIGNED_NUMBER
+%import common.WS
+%ignore WS

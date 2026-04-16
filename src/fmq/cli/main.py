@@ -4,6 +4,7 @@ import typer
 
 from fmq import __version__
 from fmq.cli.cmd_append import append_cmd
+from fmq.cli.cmd_cypher import cypher_cmd
 from fmq.cli.cmd_describe import describe_cmd
 from fmq.cli.cmd_query import query_cmd
 from fmq.cli.cmd_remove import remove_cmd
@@ -24,6 +25,7 @@ app.command(name="rename", help="Rename frontmatter fields (old=new).")(rename_c
 app.command(name="append", help="Append to list-valued fields (field=value).")(append_cmd)
 app.command(name="toggle", help="Toggle boolean fields.")(toggle_cmd)
 app.command(name="describe", help="Describe a workspace of frontmatter files.")(describe_cmd)
+app.command(name="cypher", help="Run a Cypher-subset pattern query.")(cypher_cmd)
 
 
 @app.command(name="version", help="Print fmq version and exit.")

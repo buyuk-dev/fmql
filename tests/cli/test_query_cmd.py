@@ -172,6 +172,73 @@ def test_query_follow_invalid_depth(tmp_path: Path):
     assert result.exit_code == 2
 
 
+def test_query_search_narrows(tmp_path: Path):
+    _write_ws(tmp_path)
+    (tmp_path / "tasks/a.md").write_text(
+        "---\nstatus: active\npriority: 3\n---\nfind the banana here\n",
+        encoding="utf-8",
+    )
+    runner = CliRunner()
+    result = runner.invoke(
+        app, ["query", str(tmp_path), "*", "--search", "banana"]
+    )
+    assert result.exit_code == 0, result.output
+    lines = [l for l in result.stdout.splitlines() if l.strip()]
+    assert lines == ["tasks/a.md"]
+
+
+def test_query_search_explicit_text_index(tmp_path: Path):
+    _write_ws(tmp_path)
+    (tmp_path / "tasks/a.md").write_text(
+        "---\nstatus: active\npriority: 3\n---\nbanana\n",
+        encoding="utf-8",
+    )
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["query", str(tmp_path), "*", "--search", "banana", "--index", "text"],
+    )
+    assert result.exit_code == 0, result.output
+    lines = [l for l in result.stdout.splitlines() if l.strip()]
+    assert lines == ["tasks/a.md"]
+
+
+def test_query_unknown_index_exits_2(tmp_path: Path):
+    _write_ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["query", str(tmp_path), "*", "--search", "foo", "--index", "nope"],
+    )
+    assert result.exit_code == 2
+
+
+def test_query_search_combines_with_filter(tmp_path: Path):
+    _write_ws(tmp_path)
+    (tmp_path / "tasks/a.md").write_text(
+        "---\nstatus: active\npriority: 3\n---\nbanana\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "tasks/c.md").write_text(
+        "---\nstatus: active\npriority: 1\n---\nbanana\n",
+        encoding="utf-8",
+    )
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "query",
+            str(tmp_path),
+            "priority > 2",
+            "--search",
+            "banana",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    lines = [l for l in result.stdout.splitlines() if l.strip()]
+    assert lines == ["tasks/a.md"]
+
+
 def test_query_follow_pipe_to_append(tmp_path: Path):
     _write_blocked_ws(tmp_path)
     runner = CliRunner()

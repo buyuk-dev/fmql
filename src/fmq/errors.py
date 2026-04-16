@@ -16,3 +16,11 @@ class FilterError(QueryError):
 
 class EditError(FmqError):
     pass
+
+
+class CypherError(QueryError):
+    pass
+
+
+class CypherUnsupported(CypherError):
+    pass

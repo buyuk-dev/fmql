@@ -62,7 +62,18 @@ class FollowStage:
     include_origin: bool
 
 
-Stage = Union[FilterStage, FollowStage]
+@dataclass(frozen=True)
+class SearchStage:
+    index_name: str
+    query: str
+
+
+@dataclass(frozen=True)
+class IdSetStage:
+    ids: frozenset[PacketId]
+
+
+Stage = Union[FilterStage, FollowStage, SearchStage, IdSetStage]
 
 
 @dataclass(frozen=True)
@@ -96,6 +107,26 @@ class Query:
     def all(self) -> "Query":
         return self
 
+    def search(self, query: str, *, index: str = "text") -> "Query":
+        stage = SearchStage(index_name=index, query=query)
+        return Query(self.workspace, self._stages + (stage,))
+
+    def cypher(self, text: str) -> "Query":
+        from fmq.cypher.ast import ReturnVar
+        from fmq.cypher.compile import parse_cypher
+        from fmq.cypher.executor import compile_cypher_ast
+        from fmq.errors import CypherUnsupported
+
+        ast = parse_cypher(text)
+        if len(ast.returns) != 1 or not isinstance(ast.returns[0], ReturnVar):
+            raise CypherUnsupported(
+                "Query.cypher supports only single-variable RETURN; "
+                "use fmq.cypher.compile_cypher() or the `fmq cypher` CLI for richer results"
+            )
+        result = compile_cypher_ast(ast, self.workspace)
+        id_set = frozenset(row[0] for row in result.rows)
+        return Query(self.workspace, self._stages + (IdSetStage(ids=id_set),))
+
     def group_by(self, field: str) -> "GroupedQuery":
         from fmq.aggregation import GroupedQuery
 
@@ -108,6 +139,13 @@ class Query:
                 ids = [
                     pid for pid in ids if _eval(stage.expr, self.workspace.packets[pid])
                 ]
+            elif isinstance(stage, SearchStage):
+                from fmq.search import iter_search
+
+                hits = set(iter_search(self.workspace, stage.index_name, stage.query))
+                ids = [pid for pid in ids if pid in hits]
+            elif isinstance(stage, IdSetStage):
+                ids = [pid for pid in ids if pid in stage.ids]
             else:
                 from fmq.traversal import follow
 
