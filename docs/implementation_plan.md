@@ -399,10 +399,10 @@ Each phase ends tagged + demo-able.
 ### Phase B — Edit path — **shipped**
 `edits.py` (all ops + `EditPlan`), CLI edit commands + stdin + `--dry-run` / `--yes` / confirmation, golden round-trip tests. **Ships:** single-file edits + `fmq query ... | fmq set ...`.
 
-### Phase C — Relationships & traversal
+### Phase C — Relationships & traversal - **shipped**
 `resolvers.py` (path/uuid/slug), `traversal.py` (`follow()`), `Filter → Follow → EditSink` composition, CLI `--follow` / `--depth` / `--direction`. **Ships:** "tag dependency chain" use case.
 
-### Phase D — Aggregation & describe
+### Phase D — Aggregation & describe - **shipped**
 `aggregation.py`, `describe.py`, CLI `describe` + aggregation formatter. **Ships:** sprint progress / what's slipping reports.
 
 ### Phase E — Cypher & pluggable search

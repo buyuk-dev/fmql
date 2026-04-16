@@ -9,6 +9,7 @@ from fmq.types import PacketId, Resolver
 from fmq.workspace import Workspace
 
 if TYPE_CHECKING:
+    from fmq.aggregation import GroupedQuery
     from fmq.edits import EditPlan
 
 
@@ -94,6 +95,11 @@ class Query:
 
     def all(self) -> "Query":
         return self
+
+    def group_by(self, field: str) -> "GroupedQuery":
+        from fmq.aggregation import GroupedQuery
+
+        return GroupedQuery(self, field)
 
     def _execute(self) -> list[PacketId]:
         ids: list[PacketId] = sorted(self.workspace.packets)

@@ -179,36 +179,48 @@ def _not_empty(got: Any, expected: Any) -> bool:
     return (not empty) if bool(expected) else empty
 
 
+def type_name(value: Any) -> str:
+    """YAML-native type name for a plain-Python value.
+
+    Returns one of: int, float, str, bool, date, datetime, list, map, null.
+    Unknown types return "unknown".
+    """
+    plain = _as_plain(value)
+    if plain is None:
+        return "null"
+    if isinstance(plain, bool):
+        return "bool"
+    if isinstance(plain, int):
+        return "int"
+    if isinstance(plain, float):
+        return "float"
+    if isinstance(plain, str):
+        return "str"
+    if isinstance(plain, datetime):
+        return "datetime"
+    if isinstance(plain, date):
+        return "date"
+    if isinstance(plain, list):
+        return "list"
+    if isinstance(plain, dict):
+        return "map"
+    return "unknown"
+
+
 def _type(got: Any, expected: Any) -> bool:
     if got is _MISSING:
         return False
     if not isinstance(expected, str):
         raise FilterError("`type` operator requires a string type name")
-    t = _TYPE_NAMES.get(expected.lower())
-    if t is None and expected.lower() not in _TYPE_NAMES:
+    key = expected.lower()
+    if key not in _TYPE_NAMES:
         raise FilterError(f"unknown type name: {expected!r}")
-    plain = _as_plain(got)
-    if expected.lower() in ("int", "float") and _is_bool(plain):
-        return False
-    if expected.lower() == "int":
-        return isinstance(plain, int) and not isinstance(plain, bool)
-    if expected.lower() == "float":
-        return isinstance(plain, float)
-    if expected.lower() == "bool":
-        return isinstance(plain, bool)
-    if expected.lower() == "str":
-        return isinstance(plain, str)
-    if expected.lower() in ("list",):
-        return isinstance(plain, list)
-    if expected.lower() in ("map", "dict"):
-        return isinstance(plain, dict)
-    if expected.lower() in ("null", "none"):
-        return plain is None
-    if expected.lower() == "date":
-        return isinstance(plain, date) and not isinstance(plain, datetime)
-    if expected.lower() == "datetime":
-        return isinstance(plain, datetime)
-    return False
+    name = type_name(got)
+    if key in ("dict",):
+        return name == "map"
+    if key == "none":
+        return name == "null"
+    return name == key
 
 
 _OPS: dict[str, Callable[[Any, Any], bool]] = {
