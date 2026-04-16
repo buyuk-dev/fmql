@@ -89,6 +89,19 @@ def project_pm_ws(make_workspace) -> Workspace:
             },
             "body": "task 3 body\n",
         },
+        "tasks/task-4.md": {
+            "frontmatter": {
+                "uuid": "task-4",
+                "type": "task",
+                "status": "active",
+                "priority": 2,
+                "in_sprint": "sprint-4",
+                "due_date": date(2026, 5, 5),
+                "blocked_by": ["task-1", "task-2"],
+                "tags": ["backend"],
+            },
+            "body": "task 4 body\n",
+        },
         "epics/epic-1.md": {
             "frontmatter": {
                 "uuid": "epic-1",
@@ -101,6 +114,44 @@ def project_pm_ws(make_workspace) -> Workspace:
         "notes/readme.md": {
             "frontmatter": None,
             "body": "plain markdown with no frontmatter\n",
+        },
+    }
+    return make_workspace(spec)
+
+
+@pytest.fixture
+def cycles_ws(make_workspace) -> Workspace:
+    spec: dict[str, Any] = {
+        "a.md": {
+            "frontmatter": {"uuid": "a", "blocked_by": "b"},
+            "body": "a\n",
+        },
+        "b.md": {
+            "frontmatter": {"uuid": "b", "blocked_by": "c"},
+            "body": "b\n",
+        },
+        "c.md": {
+            "frontmatter": {"uuid": "c", "blocked_by": "a"},
+            "body": "c\n",
+        },
+    }
+    return make_workspace(spec)
+
+
+@pytest.fixture
+def paths_refs_ws(make_workspace) -> Workspace:
+    spec: dict[str, Any] = {
+        "tasks/a.md": {
+            "frontmatter": {"uuid": "a", "depends_on": "b.md"},
+            "body": "a\n",
+        },
+        "tasks/b.md": {
+            "frontmatter": {"uuid": "b", "depends_on": "../shared/c.md"},
+            "body": "b\n",
+        },
+        "shared/c.md": {
+            "frontmatter": {"uuid": "c"},
+            "body": "c\n",
         },
     }
     return make_workspace(spec)

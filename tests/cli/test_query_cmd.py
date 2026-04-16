@@ -69,3 +69,137 @@ def test_version_cmd():
     result = runner.invoke(app, ["version"])
     assert result.exit_code == 0
     assert result.stdout.strip() == "0.1.0"
+
+
+# ---- follow ----
+
+
+def _write_blocked_ws(root: Path) -> None:
+    """a (uuid=a) → b (uuid=b, blocked_by=a) → c (uuid=c, blocked_by=b)."""
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "a.md").write_text(
+        "---\nuuid: a\n---\nA\n", encoding="utf-8"
+    )
+    (root / "b.md").write_text(
+        "---\nuuid: b\nblocked_by: a\n---\nB\n", encoding="utf-8"
+    )
+    (root / "c.md").write_text(
+        "---\nuuid: c\nblocked_by: b\n---\nC\n", encoding="utf-8"
+    )
+
+
+def test_query_follow_depth_1(tmp_path: Path):
+    _write_blocked_ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "query", str(tmp_path), 'uuid = "c"',
+            "--follow", "blocked_by",
+            "--depth", "1",
+            "--resolver", "uuid",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    lines = [l for l in result.stdout.splitlines() if l.strip()]
+    assert lines == ["b.md"]
+
+
+def test_query_follow_depth_star(tmp_path: Path):
+    _write_blocked_ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "query", str(tmp_path), 'uuid = "c"',
+            "--follow", "blocked_by",
+            "--depth", "*",
+            "--resolver", "uuid",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    lines = sorted(l for l in result.stdout.splitlines() if l.strip())
+    assert lines == ["a.md", "b.md"]
+
+
+def test_query_follow_reverse(tmp_path: Path):
+    _write_blocked_ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "query", str(tmp_path), 'uuid = "a"',
+            "--follow", "blocked_by",
+            "--direction", "reverse",
+            "--resolver", "uuid",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    lines = [l for l in result.stdout.splitlines() if l.strip()]
+    assert lines == ["b.md"]
+
+
+def test_query_follow_include_origin(tmp_path: Path):
+    _write_blocked_ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "query", str(tmp_path), 'uuid = "c"',
+            "--follow", "blocked_by",
+            "--depth", "*",
+            "--resolver", "uuid",
+            "--include-origin",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    lines = sorted(l for l in result.stdout.splitlines() if l.strip())
+    assert lines == ["a.md", "b.md", "c.md"]
+
+
+def test_query_follow_invalid_depth(tmp_path: Path):
+    _write_blocked_ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "query", str(tmp_path), 'uuid = "c"',
+            "--follow", "blocked_by",
+            "--depth", "foo",
+            "--resolver", "uuid",
+        ],
+    )
+    assert result.exit_code == 2
+
+
+def test_query_follow_pipe_to_append(tmp_path: Path):
+    _write_blocked_ws(tmp_path)
+    runner = CliRunner()
+    # 1) query yields paths.
+    q_result = runner.invoke(
+        app,
+        [
+            "query", str(tmp_path), 'uuid = "c"',
+            "--follow", "blocked_by",
+            "--depth", "*",
+            "--resolver", "uuid",
+            "--include-origin",
+        ],
+    )
+    assert q_result.exit_code == 0, q_result.output
+    assert q_result.stdout.strip()
+
+    # 2) pipe them into append --dry-run with --workspace.
+    pipe_result = runner.invoke(
+        app,
+        [
+            "append", "-", "tags=blocked-chain",
+            "--workspace", str(tmp_path),
+            "--dry-run",
+        ],
+        input=q_result.stdout,
+    )
+    assert pipe_result.exit_code == 0, pipe_result.output
+    # Dry-run: files on disk unchanged.
+    for name in ("a.md", "b.md", "c.md"):
+        assert "blocked-chain" not in (tmp_path / name).read_text()

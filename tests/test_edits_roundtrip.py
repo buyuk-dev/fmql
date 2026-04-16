@@ -212,8 +212,8 @@ def test_query_append_bulk(project_pm_ws) -> None:
 
     q = Query(project_pm_ws).where(type="task")
     report = q.append(tags="migrated").apply(confirm=False)
-    # All 3 tasks had tags (as a list) — all should succeed.
-    assert len(report.written) == 3
+    # Every task had tags (as a list) — all should succeed.
+    assert len(report.written) == 4
     for pid in report.written:
         tags = project_pm_ws.packets[pid].frontmatter["tags"]
         assert "migrated" in list(tags)

@@ -100,7 +100,7 @@ def test_is_empty(project_pm_ws):
 
 def test_is_not_empty(project_pm_ws):
     q = compile_query("blocked_by IS NOT EMPTY", project_pm_ws)
-    assert _ids(q) == {"tasks/task-3.md"}
+    assert _ids(q) == {"tasks/task-3.md", "tasks/task-4.md"}
 
 
 def test_is_null_false_for_absent(project_pm_ws):
@@ -117,7 +117,12 @@ def test_contains(project_pm_ws):
 def test_matches(project_pm_ws):
     q = compile_query('uuid MATCHES "^task-\\\\d+$"', project_pm_ws)
     # accept any task-N uuid
-    assert _ids(q) == {"tasks/task-1.md", "tasks/task-2.md", "tasks/task-3.md"}
+    assert _ids(q) == {
+        "tasks/task-1.md",
+        "tasks/task-2.md",
+        "tasks/task-3.md",
+        "tasks/task-4.md",
+    }
 
 
 def test_bool_literal(make_workspace):

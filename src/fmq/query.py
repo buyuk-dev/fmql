@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Iterator, Union
+from typing import TYPE_CHECKING, Any, Iterator, Optional, Union
 
 from fmq.filters import Predicate, match, parse_kwargs
 from fmq.packet import Packet
-from fmq.types import PacketId
+from fmq.types import PacketId, Resolver
 from fmq.workspace import Workspace
 
 if TYPE_CHECKING:
@@ -48,9 +48,26 @@ def _eval(expr: ExprNode, packet: Packet) -> bool:
 
 
 @dataclass(frozen=True)
+class FilterStage:
+    expr: ExprNode
+
+
+@dataclass(frozen=True)
+class FollowStage:
+    field: str
+    depth: Union[int, str]
+    direction: str
+    resolver: Optional[Resolver]
+    include_origin: bool
+
+
+Stage = Union[FilterStage, FollowStage]
+
+
+@dataclass(frozen=True)
 class Query:
     workspace: Workspace
-    _exprs: tuple[ExprNode, ...] = field(default_factory=tuple)
+    _stages: tuple[Stage, ...] = field(default_factory=tuple)
 
     def where(self, **kwargs: Any) -> "Query":
         preds = parse_kwargs(kwargs)
@@ -58,25 +75,53 @@ class Query:
             return self
         nodes = tuple(PredNode(p) for p in preds)
         expr: ExprNode = nodes[0] if len(nodes) == 1 else AndNode(nodes)
-        return Query(self.workspace, self._exprs + (expr,))
+        return Query(self.workspace, self._stages + (FilterStage(expr),))
 
     def where_expr(self, expr: ExprNode) -> "Query":
-        return Query(self.workspace, self._exprs + (expr,))
+        return Query(self.workspace, self._stages + (FilterStage(expr),))
+
+    def follow(
+        self,
+        field: str,
+        *,
+        depth: Union[int, str] = 1,
+        direction: str = "forward",
+        resolver: Optional[Resolver] = None,
+        include_origin: bool = False,
+    ) -> "Query":
+        stage = FollowStage(field, depth, direction, resolver, include_origin)
+        return Query(self.workspace, self._stages + (stage,))
 
     def all(self) -> "Query":
         return self
 
-    def _matches(self, packet: Packet) -> bool:
-        return all(_eval(expr, packet) for expr in self._exprs)
+    def _execute(self) -> list[PacketId]:
+        ids: list[PacketId] = sorted(self.workspace.packets)
+        for stage in self._stages:
+            if isinstance(stage, FilterStage):
+                ids = [
+                    pid for pid in ids if _eval(stage.expr, self.workspace.packets[pid])
+                ]
+            else:
+                from fmq.traversal import follow
+
+                ids = follow(
+                    self.workspace,
+                    ids,
+                    field=stage.field,
+                    depth=stage.depth,
+                    direction=stage.direction,
+                    resolver=stage.resolver,
+                    include_origin=stage.include_origin,
+                )
+        return ids
 
     def __iter__(self) -> Iterator[Packet]:
-        for pid in sorted(self.workspace.packets):
-            packet = self.workspace.packets[pid]
-            if self._matches(packet):
-                yield packet
+        for pid in self._execute():
+            yield self.workspace.packets[pid]
 
     def ids(self) -> list[PacketId]:
-        return [p.id for p in self]
+        return self._execute()
 
     def set(self, **assignments: Any) -> "EditPlan":
         from fmq.edits import plan_set
