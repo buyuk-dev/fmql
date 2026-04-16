@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from fmq.errors import QueryError
-from fmq.qlang import compile_query
-from fmq.query import Query
+from fm.errors import QueryError
+from fm.qlang import compile_query
+from fm.query import Query
 
 
 def _ids(q) -> set[str]:

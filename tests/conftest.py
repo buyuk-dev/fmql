@@ -7,7 +7,7 @@ from typing import Any, Callable
 import pytest
 from ruamel.yaml import YAML
 
-from fmq.workspace import Workspace
+from fm.workspace import Workspace
 
 _YAML = YAML(typ="rt", pure=True)
 _YAML.default_flow_style = False

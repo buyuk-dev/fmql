@@ -2,17 +2,17 @@ from __future__ import annotations
 
 import pytest
 
-from fmq.cypher import compile_cypher
-from fmq.cypher.ast import (
+from fm.cypher import compile_cypher
+from fm.cypher.ast import (
     NodePat,
     ReturnCount,
     ReturnField,
     ReturnVar,
 )
-from fmq.cypher.compile import parse_cypher
-from fmq.errors import CypherError, CypherUnsupported
-from fmq.query import Query
-from fmq.resolvers import UuidResolver
+from fm.cypher.compile import parse_cypher
+from fm.errors import CypherError, CypherUnsupported
+from fm.query import Query
+from fm.resolvers import UuidResolver
 
 
 def _set_rows(result):

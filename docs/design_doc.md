@@ -1,4 +1,4 @@
-# FrontMatter Utilities (fmq)
+# FrontMatter Utilities (fm)
 
 **A schemaless query engine and editor for directories of frontmatter files.**
 
@@ -31,7 +31,7 @@ A Python package + CLI that treats a directory of frontmatter files the way Mong
 ## Query Examples
 
 ```python
-from fmq import Workspace, Query
+from fm import Workspace, Query
 
 ws = Workspace("./project")
 q = Query(ws)
@@ -61,9 +61,9 @@ q.cypher("MATCH (a)-[:blocked_by*]->(a) RETURN a")  # cycle detection
 CLI:
 
 ```bash
-fmq query ./project 'status = "active" AND priority > 2'
-fmq query ./project 'type = "task"' --follow blocked_by --depth 3
-fmq describe ./project   # show observed fields, types, inconsistencies
+fm query ./project 'status = "active" AND priority > 2'
+fm query ./project 'type = "task"' --follow blocked_by --depth 3
+fm describe ./project   # show observed fields, types, inconsistencies
 ```
 
 ## Edit Examples
@@ -71,7 +71,7 @@ fmq describe ./project   # show observed fields, types, inconsistencies
 Single-file operations:
 
 ```python
-from fmq import File
+from fm import File
 
 f = File("./project/tasks/task-42.md")
 
@@ -103,14 +103,14 @@ CLI:
 
 ```bash
 # single file
-fmq set ./project/tasks/task-42.md status=escalated priority=1
-fmq remove ./project/tasks/task-42.md temp_notes
-fmq rename ./project/tasks/task-42.md assignee=assigned_to
+fm set ./project/tasks/task-42.md status=escalated priority=1
+fm remove ./project/tasks/task-42.md temp_notes
+fm rename ./project/tasks/task-42.md assignee=assigned_to
 
 # bulk: pipe query results into edits
-fmq query ./project 'status != "done" AND due_date < today' | fmq set status=escalated
-fmq query ./project 'in_sprint = "sprint-3"' | fmq append tags=migrated
-fmq query ./project '*' | fmq remove old_field
+fm query ./project 'status != "done" AND due_date < today' | fm set status=escalated
+fm query ./project 'in_sprint = "sprint-3"' | fm append tags=migrated
+fm query ./project '*' | fm remove old_field
 ```
 
 **Safety:** Bulk edits show a preview (files affected, changes to be made) and require confirmation before writing. `--dry-run` flag for scripting. `--yes` to skip confirmation. Git-friendly by design — run `git diff` after any edit to see exactly what changed.
@@ -142,18 +142,18 @@ Queries that matter daily:
 
 Edits that matter daily:
 
-- Close a task — `fmq set ./tasks/task-42.md status=done`
+- Close a task — `fm set ./tasks/task-42.md status=done`
 - Escalate overdue — `q.where(status__not_in=["done"], due_date__lt=today).set(status="escalated")`
 - Reassign someone's tasks — `q.where(assigned_to="bob").set(assigned_to="alice")`
 - Move incomplete work to next sprint — `q.where(in_sprint="sprint-3", status__not="done").set(in_sprint="sprint-4")`
 
 ## Package Shape
 
-- **Pure Python**, minimal dependencies. `pip install fmq`.
+- **Pure Python**, minimal dependencies. `pip install fm`.
 - **CLI** for terminal use and scripting.
 - **Library** for embedding in larger systems.
 - `describe` command for workspace introspection — shows all observed fields, their types across files, inconsistencies.
-- Optional `fmq[semantic]`, `fmq[sqlite]` extras for index backends.
+- Optional `fm[semantic]`, `fm[sqlite]` extras for index backends.
 - MIT licensed, designed for open-source release.
 
 ## Status

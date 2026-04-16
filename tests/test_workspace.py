@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from fmq.workspace import Workspace
+from fm.workspace import Workspace
 
 
 def test_scans_all_md(make_workspace):

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from fmq.errors import QueryError
-from fmq.resolvers import RelativePathResolver, UuidResolver
-from fmq.traversal import follow
+from fm.errors import QueryError
+from fm.resolvers import RelativePathResolver, UuidResolver
+from fm.traversal import follow
 
 
 def test_forward_depth_1(project_pm_ws):

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from fmq.errors import FmqError
-from fmq.resolvers import (
+from fm.errors import FmError
+from fm.resolvers import (
     RelativePathResolver,
     SlugResolver,
     UuidResolver,
@@ -115,5 +115,5 @@ def test_resolver_by_name_known():
 
 
 def test_resolver_by_name_unknown():
-    with pytest.raises(FmqError):
+    with pytest.raises(FmError):
         resolver_by_name("bogus")

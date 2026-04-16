@@ -1,5 +1,7 @@
 # fmq — Implementation Plan
 
+> **Note:** This plan was written under the working name `fmq`. The project is now published as **`fm`** (module, CLI, and PyPI distribution). The body below is preserved as frozen planning history; treat every `fmq` reference as the present-day `fm`.
+
 ## Context
 
 The repo at [/Users/michal/Projects/wandaos/fmq](/Users/michal/Projects/wandaos/fmq) is empty except for [design_doc.md](/Users/michal/Projects/wandaos/fmq/design_doc.md), which specifies **`fmq` (FrontMatter Utilities)**: a Python package + CLI that treats a directory of markdown/YAML frontmatter files as a queryable, editable, schemaless database — with filters, traversal, aggregation, graph patterns, pluggable search, and bulk edits that preserve formatting.

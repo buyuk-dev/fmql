@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from fmq.edits import plan_append, plan_remove, plan_rename, plan_set, plan_toggle
-from fmq.errors import EditError
+from fm.edits import plan_append, plan_remove, plan_rename, plan_set, plan_toggle
+from fm.errors import EditError
 
 
 def test_plan_set_basic_preview(project_pm_ws) -> None:
