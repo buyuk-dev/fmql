@@ -1,0 +1,69 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fmql"
+version = "0.2.0"
+description = "A schemaless query engine and editor for directories of frontmatter files."
+readme = "README.md"
+license = { text = "MIT" }
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+authors = [{ name = "Michał Michalski", email = "michal@buyuk.io" }]
+keywords = [
+    "frontmatter",
+    "yaml",
+    "markdown",
+    "query",
+    "cypher",
+    "cli",
+    "knowledge-base",
+    "notes",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Text Processing :: Markup :: Markdown",
+    "Topic :: Database :: Front-Ends",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "ruamel.yaml>=0.18",
+    "typer>=0.12",
+    "lark>=1.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/buyuk-dev/fmql"
+Repository = "https://github.com/buyuk-dev/fmql"
+Issues = "https://github.com/buyuk-dev/fmql/issues"
+Documentation = "https://github.com/buyuk-dev/fmql#readme"
+
+[project.scripts]
+fmql = "fmql.cli.main:app"
+
+[project.entry-points."fmql.search_index"]
+grep = "fmql.search.backends.grep:GrepBackend"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fmql"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.coverage.run]
+source = ["src/fmql"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
