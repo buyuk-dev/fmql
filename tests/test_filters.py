@@ -5,8 +5,8 @@ from pathlib import Path
 
 from ruamel.yaml.comments import CommentedMap
 
-from fm.filters import Predicate, match, parse_kwargs
-from fm.packet import Packet
+from fmql.filters import Predicate, match, parse_kwargs
+from fmql.packet import Packet
 
 
 def _pkt(fm: dict) -> Packet:

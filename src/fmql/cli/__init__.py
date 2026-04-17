@@ -1,3 +1,3 @@
-from fm.cli.main import app
+from fmql.cli.main import app
 
 __all__ = ["app"]

@@ -1,4 +1,4 @@
-from fm.cypher.ast import (
+from fmql.cypher.ast import (
     CypherAST,
     CypherResult,
     NodePat,
@@ -9,8 +9,8 @@ from fm.cypher.ast import (
     ReturnItem,
     ReturnVar,
 )
-from fm.cypher.compile import parse_cypher
-from fm.cypher.executor import compile_cypher
+from fmql.cypher.compile import parse_cypher
+from fmql.cypher.executor import compile_cypher
 
 __all__ = [
     "CypherAST",

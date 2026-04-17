@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from fm.errors import ParseError
-from fm.parser import parse, parse_file
+from fmql.errors import ParseError
+from fmql.parser import parse, parse_file
 
 
 def _fake_path() -> Path:

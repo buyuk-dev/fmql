@@ -6,11 +6,11 @@ from typing import Any
 from lark import Lark, Transformer, v_args
 from lark.exceptions import LarkError, VisitError
 
-from fm.dates import is_sentinel, resolve_sentinel
-from fm.errors import QueryError
-from fm.filters import Predicate
-from fm.query import AndNode, NotNode, OrNode, PredNode, Query
-from fm.workspace import Workspace
+from fmql.dates import is_sentinel, resolve_sentinel
+from fmql.errors import QueryError
+from fmql.filters import Predicate
+from fmql.query import AndNode, NotNode, OrNode, PredNode, Query
+from fmql.workspace import Workspace
 
 _GRAMMAR_PATH = Path(__file__).with_name("grammar.lark")
 

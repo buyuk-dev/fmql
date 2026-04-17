@@ -4,7 +4,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from fm.cli.main import app
+from fmql.cli.main import app
 
 
 def _ws(tmp_path: Path) -> Path:

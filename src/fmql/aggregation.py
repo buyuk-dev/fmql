@@ -3,11 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Union
 
-from fm.filters import _comparable, _is_bool, _is_number, type_name
-from fm.packet import Packet
+from fmql.filters import _comparable, _is_bool, _is_number, type_name
+from fmql.packet import Packet
 
 if TYPE_CHECKING:
-    from fm.query import Query
+    from fmql.query import Query
 
 
 _MISSING = object()

@@ -1,16 +1,16 @@
-"""fm — FrontMatter Utilities."""
+"""fmql — FrontMatter Utilities."""
 
-from fm.aggregation import Avg, Count, GroupedQuery, Max, Min, Sum
-from fm.cypher import CypherResult, compile_cypher
-from fm.dates import now, today
-from fm.describe import FieldStat, WorkspaceStats, describe
-from fm.edits import ApplyReport, EditOp, EditPlan
-from fm.errors import CypherError, CypherUnsupported, EditError
-from fm.packet import Packet
-from fm.query import Query
-from fm.resolvers import RelativePathResolver, SlugResolver, UuidResolver, resolver_by_name
-from fm.search import TextScanIndex
-from fm.workspace import Workspace
+from fmql.aggregation import Avg, Count, GroupedQuery, Max, Min, Sum
+from fmql.cypher import CypherResult, compile_cypher
+from fmql.dates import now, today
+from fmql.describe import FieldStat, WorkspaceStats, describe
+from fmql.edits import ApplyReport, EditOp, EditPlan
+from fmql.errors import CypherError, CypherUnsupported, EditError
+from fmql.packet import Packet
+from fmql.query import Query
+from fmql.resolvers import RelativePathResolver, SlugResolver, UuidResolver, resolver_by_name
+from fmql.search import TextScanIndex
+from fmql.workspace import Workspace
 
 __version__ = "0.1.0"
 

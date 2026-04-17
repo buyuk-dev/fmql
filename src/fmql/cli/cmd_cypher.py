@@ -8,10 +8,10 @@ from typing import Optional
 
 import typer
 
-from fm.cypher import compile_cypher
-from fm.errors import FmError
-from fm.resolvers import resolver_by_name
-from fm.workspace import Workspace
+from fmql.cypher import compile_cypher
+from fmql.errors import FmqlError
+from fmql.resolvers import resolver_by_name
+from fmql.workspace import Workspace
 
 
 class CypherFormat(str, Enum):
@@ -53,7 +53,7 @@ def cypher_cmd(
         default_r = resolver_by_name(resolver) if resolver else None
         ws = Workspace(path, default_resolver=default_r)
         result = compile_cypher(query, ws)
-    except FmError as e:
+    except FmqlError as e:
         typer.echo(f"error: {e}", err=True)
         raise typer.Exit(code=2)
 

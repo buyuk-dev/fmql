@@ -5,9 +5,9 @@ from typing import Optional
 
 import typer
 
-from fm.cli._edit_common import cli_guard, resolve_targets_and_workspace, run_plan
-from fm.edits import plan_remove
-from fm.errors import EditError
+from fmql.cli._edit_common import cli_guard, resolve_targets_and_workspace, run_plan
+from fmql.edits import plan_remove
+from fmql.errors import EditError
 
 
 @cli_guard

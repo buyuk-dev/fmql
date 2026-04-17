@@ -8,10 +8,10 @@ from typing import Optional, Union
 
 import typer
 
-from fm.errors import FmError
-from fm.qlang import compile_query
-from fm.resolvers import resolver_by_name
-from fm.workspace import Workspace
+from fmql.errors import FmqlError
+from fmql.qlang import compile_query
+from fmql.resolvers import resolver_by_name
+from fmql.workspace import Workspace
 
 
 class OutputFormat(str, Enum):
@@ -38,9 +38,9 @@ def _parse_depth(depth: str) -> Union[int, str]:
     try:
         n = int(depth)
     except ValueError as e:
-        raise FmError(f"invalid --depth {depth!r}: expected integer or '*'") from e
+        raise FmqlError(f"invalid --depth {depth!r}: expected integer or '*'") from e
     if n < 0:
-        raise FmError(f"invalid --depth {depth!r}: must be non-negative")
+        raise FmqlError(f"invalid --depth {depth!r}: must be non-negative")
     return n
 
 
@@ -80,7 +80,7 @@ def query_cmd(
                 include_origin=include_origin,
             )
         packets = list(q)
-    except FmError as e:
+    except FmqlError as e:
         typer.echo(f"error: {e}", err=True)
         raise typer.Exit(code=2)
 

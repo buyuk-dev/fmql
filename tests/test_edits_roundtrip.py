@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fm.edits import plan_append, plan_remove, plan_rename, plan_set, plan_toggle
-from fm.workspace import Workspace
+from fmql.edits import plan_append, plan_remove, plan_rename, plan_set, plan_toggle
+from fmql.workspace import Workspace
 
 
 def _write(root: Path, rel: str, text: str) -> None:
@@ -174,7 +174,7 @@ def test_no_eof_newline_preserved_on_edit(tmp_path: Path) -> None:
 
 def test_query_sink_roundtrip(project_pm_ws) -> None:
     """Query.set → EditPlan → apply updates workspace and disk."""
-    from fm.query import Query
+    from fmql.query import Query
 
     q = Query(project_pm_ws).where(status="active")
     matching_before = q.ids()
@@ -188,7 +188,7 @@ def test_query_sink_roundtrip(project_pm_ws) -> None:
 
 
 def test_query_append_bulk(project_pm_ws) -> None:
-    from fm.query import Query
+    from fmql.query import Query
 
     q = Query(project_pm_ws).where(type="task")
     report = q.append(tags="migrated").apply(confirm=False)

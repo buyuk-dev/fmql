@@ -5,7 +5,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from fm.cli.main import app
+from fmql.cli.main import app
 
 
 def _write_ws(root: Path) -> None:

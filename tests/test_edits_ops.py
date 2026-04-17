@@ -5,7 +5,7 @@ import io
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 
-from fm.edits import EditOp, _apply_ops_to_map
+from fmql.edits import EditOp, _apply_ops_to_map
 
 
 def _load(text: str) -> CommentedMap:

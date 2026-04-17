@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from datetime import date
 
-from fm.aggregation import Avg, Count, GroupedQuery, Max, Min, Sum
-from fm.query import Query
-from fm.resolvers import UuidResolver
+from fmql.aggregation import Avg, Count, GroupedQuery, Max, Min, Sum
+from fmql.query import Query
+from fmql.resolvers import UuidResolver
 
 
 def test_group_by_status_count_tasks(project_pm_ws):

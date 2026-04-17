@@ -5,9 +5,9 @@ from pathlib import Path
 
 import typer
 
-from fm.describe import describe, format_json, format_text
-from fm.errors import FmError
-from fm.workspace import Workspace
+from fmql.describe import describe, format_json, format_text
+from fmql.errors import FmqlError
+from fmql.workspace import Workspace
 
 
 class DescribeFormat(str, Enum):
@@ -26,7 +26,7 @@ def describe_cmd(
 ) -> None:
     try:
         ws = Workspace(path)
-    except (FmError, FileNotFoundError) as e:
+    except (FmqlError, FileNotFoundError) as e:
         typer.echo(f"error: {e}", err=True)
         raise typer.Exit(code=2)
     stats = describe(ws, top_n=top_n)

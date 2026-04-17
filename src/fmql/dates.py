@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from datetime import date, datetime, timedelta, timezone
 
-from fm.errors import FilterError
+from fmql.errors import FilterError
 
 
 def today() -> date:

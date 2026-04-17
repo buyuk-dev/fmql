@@ -3,14 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Iterator, Optional, Union
 
-from fm.filters import Predicate, match, parse_kwargs
-from fm.packet import Packet
-from fm.types import PacketId, Resolver
-from fm.workspace import Workspace
+from fmql.filters import Predicate, match, parse_kwargs
+from fmql.packet import Packet
+from fmql.types import PacketId, Resolver
+from fmql.workspace import Workspace
 
 if TYPE_CHECKING:
-    from fm.aggregation import GroupedQuery
-    from fm.edits import EditPlan
+    from fmql.aggregation import GroupedQuery
+    from fmql.edits import EditPlan
 
 
 @dataclass(frozen=True)
@@ -112,23 +112,23 @@ class Query:
         return Query(self.workspace, self._stages + (stage,))
 
     def cypher(self, text: str) -> "Query":
-        from fm.cypher.ast import ReturnVar
-        from fm.cypher.compile import parse_cypher
-        from fm.cypher.executor import compile_cypher_ast
-        from fm.errors import CypherUnsupported
+        from fmql.cypher.ast import ReturnVar
+        from fmql.cypher.compile import parse_cypher
+        from fmql.cypher.executor import compile_cypher_ast
+        from fmql.errors import CypherUnsupported
 
         ast = parse_cypher(text)
         if len(ast.returns) != 1 or not isinstance(ast.returns[0], ReturnVar):
             raise CypherUnsupported(
                 "Query.cypher supports only single-variable RETURN; "
-                "use fm.cypher.compile_cypher() or the `fm cypher` CLI for richer results"
+                "use fmql.cypher.compile_cypher() or the `fmql cypher` CLI for richer results"
             )
         result = compile_cypher_ast(ast, self.workspace)
         id_set = frozenset(row[0] for row in result.rows)
         return Query(self.workspace, self._stages + (IdSetStage(ids=id_set),))
 
     def group_by(self, field: str) -> "GroupedQuery":
-        from fm.aggregation import GroupedQuery
+        from fmql.aggregation import GroupedQuery
 
         return GroupedQuery(self, field)
 
@@ -138,14 +138,14 @@ class Query:
             if isinstance(stage, FilterStage):
                 ids = [pid for pid in ids if _eval(stage.expr, self.workspace.packets[pid])]
             elif isinstance(stage, SearchStage):
-                from fm.search import iter_search
+                from fmql.search import iter_search
 
                 hits = set(iter_search(self.workspace, stage.index_name, stage.query))
                 ids = [pid for pid in ids if pid in hits]
             elif isinstance(stage, IdSetStage):
                 ids = [pid for pid in ids if pid in stage.ids]
             else:
-                from fm.traversal import follow
+                from fmql.traversal import follow
 
                 ids = follow(
                     self.workspace,
@@ -166,26 +166,26 @@ class Query:
         return self._execute()
 
     def set(self, **assignments: Any) -> "EditPlan":
-        from fm.edits import plan_set
+        from fmql.edits import plan_set
 
         return plan_set(self.workspace, self.ids(), **assignments)
 
     def remove(self, *fields: str) -> "EditPlan":
-        from fm.edits import plan_remove
+        from fmql.edits import plan_remove
 
         return plan_remove(self.workspace, self.ids(), *fields)
 
     def rename(self, **mapping: str) -> "EditPlan":
-        from fm.edits import plan_rename
+        from fmql.edits import plan_rename
 
         return plan_rename(self.workspace, self.ids(), **mapping)
 
     def append(self, **assignments: Any) -> "EditPlan":
-        from fm.edits import plan_append
+        from fmql.edits import plan_append
 
         return plan_append(self.workspace, self.ids(), **assignments)
 
     def toggle(self, *fields: str) -> "EditPlan":
-        from fm.edits import plan_toggle
+        from fmql.edits import plan_toggle
 
         return plan_toggle(self.workspace, self.ids(), *fields)

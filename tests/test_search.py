@@ -4,10 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from fm.errors import QueryError
-from fm.query import Query
-from fm.search import TextScanIndex, get_or_create_text_index
-from fm.workspace import Workspace
+from fmql.errors import QueryError
+from fmql.query import Query
+from fmql.search import TextScanIndex, get_or_create_text_index
+from fmql.workspace import Workspace
 
 
 def _make_ws(tmp_path: Path) -> Workspace:

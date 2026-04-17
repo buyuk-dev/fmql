@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Any, Iterable, Optional, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from fm.workspace import Workspace
+    from fmql.workspace import Workspace
 
 PacketId = str
 

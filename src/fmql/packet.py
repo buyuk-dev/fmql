@@ -6,7 +6,7 @@ from typing import Any
 
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
-from fm.types import PacketId
+from fmql.types import PacketId
 
 
 @dataclass
@@ -25,7 +25,7 @@ class Packet:
         return _to_plain(self.frontmatter)
 
     def serialize(self) -> str:
-        from fm.parser import serialize_packet
+        from fmql.parser import serialize_packet
 
         return serialize_packet(self)
 

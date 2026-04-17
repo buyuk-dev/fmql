@@ -5,10 +5,10 @@ from typing import Optional
 
 import typer
 
-from fm.cli._coerce import coerce_value, split_assignments
-from fm.cli._edit_common import cli_guard, resolve_targets_and_workspace, run_plan
-from fm.edits import plan_set
-from fm.errors import EditError
+from fmql.cli._coerce import coerce_value, split_assignments
+from fmql.cli._edit_common import cli_guard, resolve_targets_and_workspace, run_plan
+from fmql.edits import plan_set
+from fmql.errors import EditError
 
 
 @cli_guard

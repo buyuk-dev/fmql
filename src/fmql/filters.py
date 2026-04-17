@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any, Callable, Iterable
 
-from fm.errors import FilterError
-from fm.packet import Packet
+from fmql.errors import FilterError
+from fmql.packet import Packet
 
 _MISSING = object()
 
@@ -80,7 +80,7 @@ def _comparable(a: Any, b: Any) -> bool:
 
 
 def _as_plain(v: Any) -> Any:
-    from fm.packet import _to_plain
+    from fmql.packet import _to_plain
 
     return _to_plain(v)
 

@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Optional
 
-from fm.errors import FmError
-from fm.types import PacketId, Resolver
+from fmql.errors import FmqlError
+from fmql.types import PacketId, Resolver
 
 
 class RelativePathResolver:
@@ -67,4 +67,4 @@ def resolver_by_name(name: str) -> Resolver:
     try:
         return _BY_NAME[name]()
     except KeyError as e:
-        raise FmError(f"unknown resolver: {name!r}") from e
+        raise FmqlError(f"unknown resolver: {name!r}") from e

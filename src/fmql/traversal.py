@@ -3,9 +3,9 @@ from __future__ import annotations
 import math
 from typing import Any, Iterable, Iterator, Optional, Union
 
-from fm.errors import QueryError
-from fm.types import PacketId, Resolver
-from fm.workspace import Workspace
+from fmql.errors import QueryError
+from fmql.types import PacketId, Resolver
+from fmql.workspace import Workspace
 
 
 def follow(

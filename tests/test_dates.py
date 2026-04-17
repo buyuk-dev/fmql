@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from fm.dates import is_sentinel, now, resolve_sentinel, today
+from fmql.dates import is_sentinel, now, resolve_sentinel, today
 
 
 def test_today_is_date():

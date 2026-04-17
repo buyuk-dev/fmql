@@ -9,11 +9,11 @@ from typing import TYPE_CHECKING, Any, Callable, Iterable, Literal, Optional
 
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
-from fm.errors import EditError
-from fm.types import PacketId
+from fmql.errors import EditError
+from fmql.types import PacketId
 
 if TYPE_CHECKING:
-    from fm.workspace import Workspace
+    from fmql.workspace import Workspace
 
 OpKind = Literal["set", "remove", "rename", "append", "toggle"]
 
@@ -148,7 +148,7 @@ class EditPlan:
         if self._compiled is not None:
             return self._compiled
 
-        from fm.parser import serialize_packet
+        from fmql.parser import serialize_packet
 
         by_pid: dict[PacketId, list[EditOp]] = {}
         order: list[PacketId] = []
@@ -239,7 +239,7 @@ class EditPlan:
         confirm_fn: Optional[Callable[[str], bool]] = None,
         preview_out: Optional[Callable[[str], None]] = None,
     ) -> ApplyReport:
-        from fm.parser import parse_file
+        from fmql.parser import parse_file
 
         changes = self.compile()
         report = ApplyReport()
@@ -248,7 +248,7 @@ class EditPlan:
             if preview_out is not None:
                 preview_out(self.preview())
             if confirm_fn is None:
-                from fm.cli.stdin import confirm_prompt
+                from fmql.cli.stdin import confirm_prompt
 
                 ok = confirm_prompt()
             else:

@@ -18,4 +18,4 @@ test:
 	uv run pytest
 
 cov:
-	uv run pytest --cov=fm --cov-report=term-missing --cov-report=xml --cov-fail-under=84
+	uv run pytest --cov=fmql --cov-report=term-missing --cov-report=xml --cov-fail-under=84

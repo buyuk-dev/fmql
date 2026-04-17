@@ -7,8 +7,8 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Optional
 
-from fm.filters import type_name
-from fm.workspace import Workspace
+from fmql.filters import type_name
+from fmql.workspace import Workspace
 
 
 @dataclass

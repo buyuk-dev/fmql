@@ -5,8 +5,8 @@ from typing import Iterable, Iterator
 
 from ruamel.yaml import YAML
 
-from fm.types import PacketId, SearchIndex
-from fm.workspace import Workspace
+from fmql.types import PacketId, SearchIndex
+from fmql.workspace import Workspace
 
 
 class TextScanIndex:
@@ -54,7 +54,7 @@ def iter_search(workspace: Workspace, index_name: str, query: str) -> Iterable[P
         get_or_create_text_index(workspace)
     index = workspace.search_indexes.get(index_name)
     if index is None:
-        from fm.errors import QueryError
+        from fmql.errors import QueryError
 
         raise QueryError(f"unknown search index: {index_name!r}")
     return index.search(query)

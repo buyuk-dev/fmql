@@ -9,9 +9,9 @@ from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap
 from ruamel.yaml.error import YAMLError
 
-from fm.errors import ParseError
-from fm.packet import Packet
-from fm.types import PacketId
+from fmql.errors import ParseError
+from fmql.packet import Packet
+from fmql.types import PacketId
 
 BOM = "\ufeff"
 FENCE = "---"

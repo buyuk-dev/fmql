@@ -4,10 +4,10 @@ import warnings
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
-from fm.errors import ParseError
-from fm.packet import Packet
-from fm.parser import parse_file
-from fm.types import PacketId, Resolver, SearchIndex
+from fmql.errors import ParseError
+from fmql.packet import Packet
+from fmql.parser import parse_file
+from fmql.types import PacketId, Resolver, SearchIndex
 
 
 class Workspace:
@@ -28,7 +28,7 @@ class Workspace:
         self.resolvers: dict[str, Resolver] = dict(resolvers or {})
         self.search_indexes: dict[str, SearchIndex] = dict(search_indexes or {})
         if default_resolver is None:
-            from fm.resolvers import RelativePathResolver
+            from fmql.resolvers import RelativePathResolver
 
             default_resolver = RelativePathResolver()
         self.default_resolver: Resolver = default_resolver

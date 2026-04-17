@@ -7,7 +7,7 @@ from typing import Any, Optional
 from lark import Lark, Transformer, v_args
 from lark.exceptions import LarkError, VisitError
 
-from fm.cypher.ast import (
+from fmql.cypher.ast import (
     CypherAST,
     NodePat,
     Pattern,
@@ -17,10 +17,10 @@ from fm.cypher.ast import (
     ReturnItem,
     ReturnVar,
 )
-from fm.dates import is_sentinel, resolve_sentinel
-from fm.errors import CypherError, CypherUnsupported
-from fm.filters import Predicate
-from fm.query import AndNode, ExprNode, NotNode, OrNode, PredNode
+from fmql.dates import is_sentinel, resolve_sentinel
+from fmql.errors import CypherError, CypherUnsupported
+from fmql.filters import Predicate
+from fmql.query import AndNode, ExprNode, NotNode, OrNode, PredNode
 
 _GRAMMAR_PATH = Path(__file__).with_name("grammar.lark")
 
@@ -60,7 +60,7 @@ _REVERSE_REL_RE = re.compile(r"<\s*-\s*\[")
 def _check_unsupported(text: str) -> None:
     for pattern, label in _UNSUPPORTED_KEYWORDS:
         if re.search(pattern, text):
-            raise CypherUnsupported(f"{label} is not supported in fm cypher subset")
+            raise CypherUnsupported(f"{label} is not supported in fmql cypher subset")
     m = _AGG_FN_RE.search(text)
     if m:
         raise CypherUnsupported(

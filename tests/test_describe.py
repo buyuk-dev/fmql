@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import date
 
-from fm.describe import WorkspaceStats, describe, format_json, format_text
+from fmql.describe import WorkspaceStats, describe, format_json, format_text
 
 
 def _field(stats: WorkspaceStats, name: str):

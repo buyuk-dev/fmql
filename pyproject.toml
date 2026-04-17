@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "fm"
+name = "fmql"
 version = "0.1.0"
 description = "A schemaless query engine and editor for directories of frontmatter files."
 readme = "README.md"
@@ -44,16 +44,16 @@ dependencies = [
 dev = ["pytest>=8", "pytest-cov>=5", "black>=24", "ruff>=0.5"]
 
 [project.urls]
-Homepage = "https://github.com/luon-ai/fm"
-Repository = "https://github.com/luon-ai/fm"
-Issues = "https://github.com/luon-ai/fm/issues"
-Documentation = "https://github.com/luon-ai/fm#readme"
+Homepage = "https://github.com/luon-ai/fmql"
+Repository = "https://github.com/luon-ai/fmql"
+Issues = "https://github.com/luon-ai/fmql/issues"
+Documentation = "https://github.com/luon-ai/fmql#readme"
 
 [project.scripts]
-fm = "fm.cli.main:app"
+fmql = "fmql.cli.main:app"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/fm"]
+packages = ["src/fmql"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -71,7 +71,7 @@ target-version = "py311"
 select = ["E", "F", "W", "I"]
 
 [tool.coverage.run]
-source = ["src/fm"]
+source = ["src/fmql"]
 branch = true
 
 [tool.coverage.report]

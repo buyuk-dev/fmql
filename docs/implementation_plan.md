@@ -1,6 +1,6 @@
 # fmq — Implementation Plan
 
-> **Note:** This plan was written under the working name `fmq`. The project is now published as **`fm`** (module, CLI, and PyPI distribution). The body below is preserved as frozen planning history; treat every `fmq` reference as the present-day `fm`.
+> **Note:** This plan was written under the working name `fmq`. The project is now published as **`fmql`** (module, CLI, and PyPI distribution). The body below is preserved as frozen planning history; treat every `fmq` reference as the present-day `fmql`.
 
 ## Context
 

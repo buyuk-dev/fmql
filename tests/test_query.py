@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from fm.query import Query
-from fm.resolvers import UuidResolver
+from fmql.query import Query
+from fmql.resolvers import UuidResolver
 
 
 def test_all_returns_every_packet(project_pm_ws):

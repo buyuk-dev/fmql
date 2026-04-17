@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Optional, Union
 
-from fm.query import ExprNode
+from fmql.query import ExprNode
 
 
 @dataclass(frozen=True)

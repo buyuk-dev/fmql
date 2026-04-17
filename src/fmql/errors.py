@@ -1,12 +1,12 @@
-class FmError(Exception):
+class FmqlError(Exception):
     pass
 
 
-class ParseError(FmError):
+class ParseError(FmqlError):
     pass
 
 
-class QueryError(FmError):
+class QueryError(FmqlError):
     pass
 
 
@@ -14,7 +14,7 @@ class FilterError(QueryError):
     pass
 
 
-class EditError(FmError):
+class EditError(FmqlError):
     pass
 
 

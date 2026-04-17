@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from fm.parser import parse, parse_file, serialize_packet
+from fmql.parser import parse, parse_file, serialize_packet
 
 FIXTURE_ROOT = Path(__file__).parent / "fixtures" / "project_pm"
 

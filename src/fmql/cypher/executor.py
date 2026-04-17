@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from fm.cypher.ast import (
+from fmql.cypher.ast import (
     CypherAST,
     CypherResult,
     Pattern,
@@ -13,12 +13,12 @@ from fm.cypher.ast import (
     ReturnItem,
     ReturnVar,
 )
-from fm.cypher.compile import parse_cypher
-from fm.errors import CypherError
-from fm.filters import Predicate, match
-from fm.query import AndNode, ExprNode, NotNode, OrNode, PredNode
-from fm.types import PacketId, Resolver
-from fm.workspace import Workspace
+from fmql.cypher.compile import parse_cypher
+from fmql.errors import CypherError
+from fmql.filters import Predicate, match
+from fmql.query import AndNode, ExprNode, NotNode, OrNode, PredNode
+from fmql.types import PacketId, Resolver
+from fmql.workspace import Workspace
 
 Binding = dict[str, PacketId]
 

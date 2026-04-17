@@ -7,11 +7,11 @@ from typing import Callable, Optional
 
 import typer
 
-from fm.cli.stdin import StdinResult, confirm_prompt, read_stdin_targets
-from fm.edits import EditPlan
-from fm.errors import EditError, FmError
-from fm.types import PacketId
-from fm.workspace import Workspace
+from fmql.cli.stdin import StdinResult, confirm_prompt, read_stdin_targets
+from fmql.edits import EditPlan
+from fmql.errors import EditError, FmqlError
+from fmql.types import PacketId
+from fmql.workspace import Workspace
 
 
 def _compute_lcp(paths: list[Path]) -> Optional[Path]:
@@ -135,7 +135,7 @@ def resolve_targets_and_workspace(
 def _resolve_stdin_path(raw: str, ws: Workspace) -> PacketId:
     """Resolve a raw stdin path to a workspace-relative PacketId.
 
-    Try (a) workspace-relative first (covers `fm query` output), then
+    Try (a) workspace-relative first (covers `fmql query` output), then
     (b) absolute or CWD-relative resolution.
     """
     # (a) workspace-relative
@@ -205,7 +205,7 @@ def cli_guard(func: Callable[..., int]) -> Callable[..., None]:
     def wrapper(*args, **kwargs) -> None:
         try:
             code = func(*args, **kwargs)
-        except FmError as e:
+        except FmqlError as e:
             typer.echo(f"error: {e}", err=True)
             raise typer.Exit(code=2)
         if code != 0:
