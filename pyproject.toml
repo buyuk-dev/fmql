@@ -44,10 +44,10 @@ dependencies = [
 dev = ["pytest>=8", "pytest-cov>=5", "black>=24", "ruff>=0.5"]
 
 [project.urls]
-Homepage = "https://github.com/luon-ai/fmql"
-Repository = "https://github.com/luon-ai/fmql"
-Issues = "https://github.com/luon-ai/fmql/issues"
-Documentation = "https://github.com/luon-ai/fmql#readme"
+Homepage = "https://github.com/buyuk-dev/fmql"
+Repository = "https://github.com/buyuk-dev/fmql"
+Issues = "https://github.com/buyuk-dev/fmql/issues"
+Documentation = "https://github.com/buyuk-dev/fmql#readme"
 
 [project.scripts]
 fmql = "fmql.cli.main:app"

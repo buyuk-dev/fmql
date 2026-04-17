@@ -3,7 +3,7 @@
 A schemaless query engine and editor for directories of frontmatter (markdown + YAML) files.
 
 [![PyPI](https://img.shields.io/pypi/v/fmql.svg)](https://pypi.org/project/fmql/)
-[![CI](https://github.com/luon-ai/fmql/actions/workflows/ci.yml/badge.svg)](https://github.com/luon-ai/fmql/actions/workflows/ci.yml)
+[![CI](https://github.com/buyuk-dev/fmql/actions/workflows/ci.yml/badge.svg)](https://github.com/buyuk-dev/fmql/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/pypi/pyversions/fmql.svg)](https://pypi.org/project/fmql/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
@@ -18,7 +18,7 @@ pip install fmql
 From source:
 
 ```bash
-git clone https://github.com/luon-ai/fmql.git
+git clone https://github.com/buyuk-dev/fmql.git
 cd fmql
 uv sync                    # or: pip install -e '.[dev]'
 ```
@@ -279,4 +279,4 @@ make format  # black
 - [Design document](docs/design_doc.md) — rationale, comparisons, target surface.
 - [Implementation plan](docs/implementation_plan.md) — milestone map (frozen; written under the working name `fmq`).
 - [LICENSE](LICENSE) — MIT.
-- [GitHub](https://github.com/luon-ai/fmql) — source, issues, releases.
+- [GitHub](https://github.com/buyuk-dev/fmql) — source, issues, releases.
