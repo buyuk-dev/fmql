@@ -276,7 +276,6 @@ make format  # black
 
 ## Links
 
-- [Design document](docs/design_doc.md) — rationale, comparisons, target surface.
-- [Implementation plan](docs/implementation_plan.md) — milestone map (frozen; written under the working name `fmq`).
+- [Design document](docs/design.md) — rationale, comparisons, target surface.
 - [LICENSE](LICENSE) — MIT.
 - [GitHub](https://github.com/buyuk-dev/fmql) — source, issues, releases.
