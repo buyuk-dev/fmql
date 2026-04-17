@@ -1,15 +1,8 @@
 # fmql-semantic — Implementation Spec
 
-**Package:** `fmql-semantic`
-**Target version:** 0.1.0 (first release)
-**Depends on:** `fmql>=0.2` (plugin protocol), `litellm`, `sqlite-vec`
-**Status:** Design
-**Author:** Michał Michalski
-**Last updated:** 2026-04-17
+**hybrid vector search with bm25 reranker in sqlite RRF**
 
-## Goal
-
-Ship semantic search for fmql as a separate pip-installable package that registers itself via the `fmql.search_index` entry point. Uses LiteLLM as the embedding provider abstraction and sqlite-vec as the local vector store. Delivered as the first reference implementation of a third-party fmql plugin.
+Ship semantic search for fmql as a separate pip-installable package that registers itself via the `fmql.search_index` entry point. Uses LiteLLM as the embedding provider abstraction and `sqlite-vec` as the local vector store. Delivered as the first reference implementation of a third-party fmql plugin.
 
 ## Non-goals
 
