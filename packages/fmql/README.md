@@ -125,6 +125,25 @@ fmql query ./project 'NOT (assigned_to IS EMPTY)'
 fmql query ./project 'title MATCHES "^\\[WIP\\]"'
 ```
 
+Ordering with `ORDER BY`:
+
+```
+<query> ORDER BY field [ASC|DESC] [NULLS FIRST|NULLS LAST] [, field …]
+```
+
+- `ASC` (default) or `DESC` per key.
+- `NULLS FIRST` / `NULLS LAST` is optional. Default follows SQL convention: `ASC` → nulls last, `DESC` → nulls first.
+- Multiple keys are evaluated left-to-right.
+- Values of different types are bucketed by type (booleans → numbers → dates → strings) so mixed-type fields don't raise.
+
+```bash
+fmql query ./project 'status = "open" ORDER BY priority DESC'
+fmql query ./project '* ORDER BY due_date ASC NULLS LAST'
+fmql query ./project 'type = "task" ORDER BY status, priority DESC'
+```
+
+`ORDER`, `BY`, `ASC`, `DESC`, `NULLS`, `FIRST`, `LAST` are reserved words (case-insensitive) in the query grammar.
+
 ### Python kwargs API
 
 `field__op=value` — everything before the final `__` is the field, everything after is the operator. No `__` means `eq`.
@@ -156,6 +175,8 @@ Query(ws).where(tags__contains="urgent")
 Query(ws).where(status__in=["todo", "in_progress"])
 Query(ws).where(assigned_to__not_empty=True)
 Query(ws).where(title__matches=r"^\[WIP\]")
+Query(ws).where(status="open").order_by("priority", desc=True)
+Query(ws).order_by("status").order_by("priority", desc=True, nulls="last")
 ```
 
 ### Cypher subset (`cypher` command)
@@ -170,9 +191,11 @@ RETURN a
 RETURN a, b
 RETURN a.title
 RETURN count(a)
+ORDER BY a.priority DESC [NULLS LAST]   # sort returned rows; keys may reference
+                                        # any bound variable, not just RETURN items
 ```
 
-Node labels parse but are ignored (schemaless). The `WHERE` clause uses the same operators as the filter DSL.
+Node labels parse but are ignored (schemaless). The `WHERE` clause uses the same operators as the filter DSL. `ORDER BY` supports multiple comma-separated keys (`var` or `var.field`) with per-key `ASC`/`DESC` and optional `NULLS FIRST` / `NULLS LAST`; default nulls policy matches SQL (`ASC` → nulls last).
 
 ```bash
 fmql cypher ./project 'MATCH (a)-[:blocked_by*]->(a) RETURN a'

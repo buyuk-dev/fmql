@@ -1,6 +1,8 @@
 ?start: query
 
-query: STAR         -> q_star
+query: body order_by_clause?
+
+?body: STAR         -> q_star
      | or_expr      -> q_expr
 
 STAR: "*"
@@ -29,6 +31,12 @@ value: ESCAPED_STRING  -> v_string
      | DATE_OFFSET     -> v_date_offset
      | IDENT           -> v_ident
 
+order_by_clause: ORDER_KW BY_KW order_key (COMMA order_key)*
+order_key: IDENT direction_kw? nulls_spec?
+direction_kw: ASC_KW | DESC_KW
+nulls_spec: NULLS_KW FIRST_KW
+          | NULLS_KW LAST_KW
+
 AND_KW.3: "AND"i
 OR_KW.3: "OR"i
 NOT_KW.3: "NOT"i
@@ -38,8 +46,17 @@ EMPTY_KW.3: "EMPTY"i
 NULL_KW.3: "NULL"i
 CONTAINS_KW.3: "CONTAINS"i
 MATCHES_KW.3: "MATCHES"i
+ORDER_KW.5: "ORDER"i
+BY_KW.5: "BY"i
+ASC_KW.4: "ASC"i
+DESC_KW.4: "DESC"i
+NULLS_KW.4: "NULLS"i
+FIRST_KW.3: "FIRST"i
+LAST_KW.3: "LAST"i
 BOOL_KW.3: "true"i | "false"i
 DATE_OFFSET.3: /(today|now|yesterday|tomorrow)[+-]\d+[smhdw]/
+
+COMMA: ","
 
 GTE: ">="
 LTE: "<="

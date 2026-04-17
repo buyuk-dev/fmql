@@ -16,6 +16,7 @@ from fmql.cypher.ast import (
 from fmql.cypher.compile import parse_cypher
 from fmql.errors import CypherError
 from fmql.filters import Predicate, match
+from fmql.ordering import OrderKey, apply_order
 from fmql.query import AndNode, ExprNode, NotNode, OrNode, PredNode
 from fmql.types import PacketId, Resolver
 from fmql.workspace import Workspace
@@ -33,7 +34,9 @@ def compile_cypher_ast(ast: CypherAST, workspace: Workspace) -> CypherResult:
     bindings = _enumerate(workspace, ast.pattern)
     if ast.where is not None:
         bindings = [b for b in bindings if _eval_scoped(ast.where, b, workspace)]
-    return _project(ast.returns, bindings, workspace)
+    if ast.order_by:
+        bindings = _sort_bindings(bindings, ast.order_by, workspace)
+    return _project(ast.returns, bindings, workspace, sort_rows=not ast.order_by)
 
 
 def _validate(ast: CypherAST) -> None:
@@ -43,6 +46,10 @@ def _validate(ast: CypherAST) -> None:
             raise CypherError(f"RETURN references undeclared variable {item.var!r}")
     if ast.where is not None:
         _check_where_vars(ast.where, vars_declared)
+    for key in ast.order_by:
+        var = key.field.split(".", 1)[0]
+        if var not in vars_declared:
+            raise CypherError(f"ORDER BY references undeclared variable {var!r}")
 
 
 def _check_where_vars(expr: ExprNode, declared: set[str]) -> None:
@@ -158,6 +165,8 @@ def _project(
     returns: tuple[ReturnItem, ...],
     bindings: list[Binding],
     workspace: Workspace,
+    *,
+    sort_rows: bool = True,
 ) -> CypherResult:
     if len(returns) == 1 and isinstance(returns[0], ReturnCount):
         return CypherResult(
@@ -173,8 +182,32 @@ def _project(
     for b in bindings:
         row = tuple(_project_item(r, b, workspace) for r in returns)
         rows.append(row)
-    rows = _dedupe_sort(rows)
+    rows = _dedupe_sort(rows, sort_rows=sort_rows)
     return CypherResult(columns=columns, rows=tuple(rows), is_scalar=False, scalar=None)
+
+
+def _sort_bindings(
+    bindings: list[Binding],
+    keys: tuple[OrderKey, ...],
+    workspace: Workspace,
+) -> list[Binding]:
+    def extract(binding: Binding, key: OrderKey) -> tuple[Any, bool]:
+        ref = key.field
+        var, _, field = ref.partition(".")
+        pid = binding.get(var)
+        if pid is None:
+            return (None, True)
+        if not field:
+            return (pid, False)
+        packet = workspace.packets.get(pid)
+        if packet is None:
+            return (None, True)
+        plain = packet.as_plain()
+        if field not in plain:
+            return (None, True)
+        return (plain[field], False)
+
+    return apply_order(bindings, keys, extract)
 
 
 def _column_name(r: ReturnItem) -> str:
@@ -199,7 +232,7 @@ def _project_item(item: ReturnItem, binding: Binding, workspace: Workspace) -> A
     raise CypherError(f"unprojectable item: {type(item).__name__}")
 
 
-def _dedupe_sort(rows: list[tuple[Any, ...]]) -> list[tuple[Any, ...]]:
+def _dedupe_sort(rows: list[tuple[Any, ...]], *, sort_rows: bool = True) -> list[tuple[Any, ...]]:
     seen: set[tuple[Any, ...]] = set()
     uniq: list[tuple[Any, ...]] = []
     for row in rows:
@@ -212,10 +245,11 @@ def _dedupe_sort(rows: list[tuple[Any, ...]]) -> list[tuple[Any, ...]]:
         if key is not None:
             seen.add(key)
         uniq.append(row)
-    try:
-        uniq.sort(key=lambda r: tuple(_sort_key(v) for v in r))
-    except TypeError:
-        pass
+    if sort_rows:
+        try:
+            uniq.sort(key=lambda r: tuple(_sort_key(v) for v in r))
+        except TypeError:
+            pass
     return uniq
 
 

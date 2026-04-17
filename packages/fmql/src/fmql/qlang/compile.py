@@ -9,6 +9,7 @@ from lark.exceptions import LarkError, VisitError
 from fmql.dates import is_sentinel, resolve_sentinel
 from fmql.errors import QueryError
 from fmql.filters import Predicate
+from fmql.ordering import OrderKey
 from fmql.query import AndNode, NotNode, OrNode, PredNode, Query
 from fmql.workspace import Workspace
 
@@ -52,6 +53,37 @@ class _Compiler(Transformer):
     @v_args(inline=True)
     def q_expr(self, expr):
         return expr
+
+    def query(self, children):
+        body = children[0]
+        order_by: tuple[OrderKey, ...] = ()
+        for c in children[1:]:
+            if isinstance(c, tuple) and c and c[0] == "__order__":
+                order_by = c[1]
+        return ("__query__", body, order_by)
+
+    def order_by_clause(self, children):
+        keys = tuple(c for c in children if isinstance(c, OrderKey))
+        return ("__order__", keys)
+
+    @v_args(inline=True)
+    def order_key(self, ident, *rest):
+        desc = False
+        nulls = "auto"
+        for item in rest:
+            if isinstance(item, tuple) and item and item[0] == "__dir__":
+                desc = item[1]
+            elif isinstance(item, tuple) and item and item[0] == "__nulls__":
+                nulls = item[1]
+        return OrderKey(field=str(ident), desc=desc, nulls=nulls)
+
+    def direction_kw(self, children):
+        tok = children[0]
+        return ("__dir__", str(tok).upper() == "DESC")
+
+    def nulls_spec(self, children):
+        last = children[-1]
+        return ("__nulls__", "last" if str(last).upper() == "LAST" else "first")
 
     def or_list(self, items):
         items = [i for i in items if not _is_kw_token(i)]
@@ -157,8 +189,15 @@ def compile_query(text: str, workspace: Workspace) -> Query:
         if isinstance(e.orig_exc, QueryError):
             raise e.orig_exc
         raise
-    if isinstance(result, _STAR):
-        return Query(workspace)
-    if not isinstance(result, (PredNode, AndNode, OrNode, NotNode)):
+    if not (isinstance(result, tuple) and result and result[0] == "__query__"):
         raise QueryError(f"unexpected top-level result: {result!r}")
-    return Query(workspace).where_expr(result)
+    _, body, order_by = result
+    if isinstance(body, _STAR):
+        q = Query(workspace)
+    elif isinstance(body, (PredNode, AndNode, OrNode, NotNode)):
+        q = Query(workspace).where_expr(body)
+    else:
+        raise QueryError(f"unexpected query body: {body!r}")
+    if order_by:
+        q = q.order_by_keys(order_by)
+    return q

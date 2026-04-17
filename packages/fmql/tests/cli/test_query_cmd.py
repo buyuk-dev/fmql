@@ -60,6 +60,26 @@ def test_query_bad_syntax_exits_nonzero(tmp_path: Path):
     assert result.exit_code == 2
 
 
+def test_query_order_by_desc(tmp_path: Path):
+    _write_ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(app, ["query", str(tmp_path), "* ORDER BY priority DESC"])
+    assert result.exit_code == 0, result.output
+    lines = [ln for ln in result.stdout.splitlines() if ln.strip()]
+    # priority 3, then ties at 1 broken stably by packet id order
+    assert lines == ["tasks/a.md", "tasks/b.md", "tasks/c.md"]
+
+
+def test_query_order_by_asc(tmp_path: Path):
+    _write_ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(app, ["query", str(tmp_path), "* ORDER BY priority"])
+    assert result.exit_code == 0, result.output
+    lines = [ln for ln in result.stdout.splitlines() if ln.strip()]
+    # priorities [3, 1, 1] → ascending: two 1s first (stable by id), then 3
+    assert lines == ["tasks/b.md", "tasks/c.md", "tasks/a.md"]
+
+
 def test_version_cmd():
     runner = CliRunner()
     result = runner.invoke(app, ["version"])
