@@ -11,7 +11,7 @@ from fmql.query import Query
 from fmql.resolvers import RelativePathResolver, SlugResolver, UuidResolver, resolver_by_name
 from fmql.workspace import Workspace
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 __all__ = [
     "ApplyReport",
