@@ -71,11 +71,6 @@ One-time work, done when `fmql-semantic` is ready to ship:
 2. Add top-level workspace config and monorepo README.
 3. Adopt the `core-v*` tag convention; document that old `v*` tags are historical.
 4. Add `packages/fmql-semantic/` alongside.
+5. We need to update `CI workflows accordingly, and ensure that repo settings (branch protections, tags rulesets, etc) are updated to reflect tagging convention changes.
 
 Nothing changes for existing users installing the current `fmql` package. Next release tagged `core-v0.2.0` lands on PyPI identically to how current releases do.
-
-## Out of scope
-
-- Implementation of the CI workflow (separate doc).
-- Contents of `fmql-semantic` (covered by its own spec).
-- Cross-package refactoring of conformance tests (covered by plugin architecture spec).
