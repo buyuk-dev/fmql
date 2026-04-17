@@ -6,8 +6,19 @@ on:
   pull_request:
 
 jobs:
-  ci:
+  test:
+    name: test (${{ matrix.package }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: fmql
+            import_name: fmql
+            cov_threshold: "84"
+          - package: fmql-semantic
+            import_name: fmql_semantic
+            cov_threshold: "0"
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - name: Install uv
@@ -15,15 +26,23 @@ jobs:
         with:
           python-version: "3.11"
           enable-cache: true
-      - name: Sync deps
-        run: uv sync --extra dev
-      - name: Lint
-        run: make lint
-      - name: Test with coverage
-        run: make cov
+      - name: Sync workspace
+        run: uv sync --group dev
+      - name: Lint (${{ matrix.package }})
+        run: |
+          uv run ruff check packages/${{ matrix.package }}/src packages/${{ matrix.package }}/tests
+          uv run black --check packages/${{ matrix.package }}/src packages/${{ matrix.package }}/tests
+      - name: Test with coverage (${{ matrix.package }})
+        working-directory: packages/${{ matrix.package }}
+        run: |
+          uv run pytest \
+            --cov=${{ matrix.import_name }} \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage.xml \
+            --cov-fail-under=${{ matrix.cov_threshold }}
       - name: Upload coverage artifact
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: coverage-xml
-          path: coverage.xml
+          name: coverage-${{ matrix.package }}
+          path: packages/${{ matrix.package }}/coverage.xml
