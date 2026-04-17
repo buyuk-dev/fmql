@@ -1,6 +1,6 @@
 ?start: cypher
 
-cypher: match_clause where_clause? return_clause
+cypher: match_clause where_clause? return_clause order_clause?
 
 match_clause: MATCH_KW pattern
 
@@ -18,6 +18,14 @@ range_spec: INT ".." INT   -> range_both
 where_clause: WHERE_KW or_expr
 
 return_clause: RETURN_KW return_item (COMMA return_item)*
+
+order_clause: ORDER_KW BY_KW cypher_order_key (COMMA cypher_order_key)*
+cypher_order_key: order_ref direction_kw? nulls_spec?
+order_ref: qualified_ident   -> order_ref_qual
+         | IDENT              -> order_ref_var
+direction_kw: ASC_KW | DESC_KW
+nulls_spec: NULLS_KW FIRST_KW
+          | NULLS_KW LAST_KW
 
 return_item: COUNT_KW "(" IDENT ")"          -> r_count
            | IDENT "." IDENT                 -> r_field
@@ -53,6 +61,13 @@ MATCH_KW.5: "MATCH"i
 WHERE_KW.5: "WHERE"i
 RETURN_KW.5: "RETURN"i
 COUNT_KW.5: "count"i
+ORDER_KW.5: "ORDER"i
+BY_KW.5: "BY"i
+ASC_KW.4: "ASC"i
+DESC_KW.4: "DESC"i
+NULLS_KW.4: "NULLS"i
+FIRST_KW.3: "FIRST"i
+LAST_KW.3: "LAST"i
 
 AND_KW.3: "AND"i
 OR_KW.3: "OR"i

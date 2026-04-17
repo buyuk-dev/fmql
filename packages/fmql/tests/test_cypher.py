@@ -89,7 +89,6 @@ def test_parse_keywords_are_case_insensitive():
         "MATCH (a)-[:f]->(b) WITH a RETURN a",
         "UNWIND [1,2] AS x RETURN x",
         "MATCH p = shortestPath((a)-[:f*]->(b)) RETURN p",
-        "MATCH (a) RETURN a ORDER BY a.x",
         "MATCH (a) RETURN a LIMIT 10",
         "MATCH (a) RETURN sum(a)",
         "MATCH (a) RETURN avg(a.x)",
@@ -228,3 +227,67 @@ def test_query_cypher_count_rejected(blocked_ws):
 def test_query_cypher_field_return_rejected(blocked_ws):
     with pytest.raises(CypherUnsupported):
         Query(blocked_ws).cypher("MATCH (a)-[:blocked_by]->(b) RETURN a.uuid")
+
+
+# ---------- ORDER BY ----------
+
+
+def test_parse_order_by_single_key():
+    ast = parse_cypher("MATCH (a) RETURN a ORDER BY a.priority DESC")
+    assert len(ast.order_by) == 1
+    k = ast.order_by[0]
+    assert k.field == "a.priority"
+    assert k.desc is True
+    assert k.nulls == "auto"
+
+
+def test_parse_order_by_multi_key_and_nulls():
+    ast = parse_cypher("MATCH (a) RETURN a ORDER BY a.status ASC, a.priority DESC NULLS LAST")
+    fields = [(k.field, k.desc, k.nulls) for k in ast.order_by]
+    assert fields == [("a.status", False, "auto"), ("a.priority", True, "last")]
+
+
+def test_exec_order_by_var(project_pm_ws):
+    res = compile_cypher("MATCH (a) RETURN a ORDER BY a.priority", project_pm_ws)
+    # Rows are single-tuple (packet_id,). Extract the priority of each.
+    priorities = [project_pm_ws.packets[row[0]].as_plain().get("priority") for row in res.rows]
+    # Non-null numeric ascending, strings bucketed separately, nulls last.
+    # Numerics first: 1, 2, 3, 5; then string 'high'; then nulls (none packet, epic).
+    assert priorities[:4] == [1, 2, 3, 5]
+
+
+def test_exec_order_by_desc_nulls_last(project_pm_ws):
+    res = compile_cypher(
+        "MATCH (a) RETURN a.uuid ORDER BY a.priority DESC NULLS LAST",
+        project_pm_ws,
+    )
+    numeric_rows = [row for row in res.rows if row[0] is not None]
+    # First non-null numeric rows should be strictly descending among numerics.
+    nums = []
+    for (uuid,) in numeric_rows:
+        p = next(
+            (
+                pkt.as_plain().get("priority")
+                for pkt in project_pm_ws.packets.values()
+                if pkt.as_plain().get("uuid") == uuid
+            ),
+            None,
+        )
+        if isinstance(p, (int, float)):
+            nums.append(p)
+    assert nums == sorted(nums, reverse=True)
+
+
+def test_exec_order_by_references_undeclared_var(project_pm_ws):
+    with pytest.raises(CypherError):
+        compile_cypher("MATCH (a) RETURN a ORDER BY z.priority", project_pm_ws)
+
+
+def test_exec_order_by_unprojected_field(project_pm_ws):
+    # ORDER BY can reference a field that isn't in RETURN.
+    res = compile_cypher(
+        "MATCH (a) RETURN a.uuid ORDER BY a.priority DESC NULLS LAST",
+        project_pm_ws,
+    )
+    # Just verifying it executes and returns all packets.
+    assert len(res.rows) == len(project_pm_ws.packets)

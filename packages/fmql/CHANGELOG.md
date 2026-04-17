@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- `ORDER BY` clause in both the Filter DSL (QLang) and the Cypher subset. Supports multiple comma-separated keys with per-key `ASC`/`DESC` and optional `NULLS FIRST` / `NULLS LAST` (default follows SQL: `ASC` → nulls last, `DESC` → nulls first). Cypher ORDER BY keys may reference any bound variable, not just items in `RETURN`.
+- `Query.order_by(field, *, desc=False, nulls="auto")` fluent method. Chained calls accumulate keys in declaration order.
+- New `fmql.ordering` module exposing `OrderKey` and the shared sort-key helper.
+
+### Changed
+
+- `ORDER`, `BY`, `ASC`, `DESC`, `NULLS`, `FIRST`, `LAST` become reserved words (case-insensitive) in both the QLang and Cypher grammars. Existing queries using these as bare identifiers in keyword positions would have already been syntax errors; string/number/date literals are unaffected.
+- Cypher's `ORDER BY` is now supported rather than rejected with `CypherUnsupported`.
+
 ## [0.2.0]
 
 ### Added

@@ -20,6 +20,7 @@ from fmql.cypher.ast import (
 from fmql.dates import is_sentinel, resolve_sentinel
 from fmql.errors import CypherError, CypherUnsupported
 from fmql.filters import Predicate
+from fmql.ordering import OrderKey
 from fmql.query import AndNode, ExprNode, NotNode, OrNode, PredNode
 
 _GRAMMAR_PATH = Path(__file__).with_name("grammar.lark")
@@ -46,7 +47,6 @@ _UNSUPPORTED_KEYWORDS: tuple[tuple[str, str], ...] = (
     (r"\bUNWIND\b", "UNWIND"),
     (r"\bshortestPath\b", "shortestPath"),
     (r"\ballShortestPaths\b", "allShortestPaths"),
-    (r"\bORDER\s+BY\b", "ORDER BY"),
     (r"\bSKIP\b", "SKIP"),
     (r"\bLIMIT\b", "LIMIT"),
     (r"\bUNION\b", "UNION"),
@@ -88,12 +88,15 @@ class _Compiler(Transformer):
         match_tree = children[0]
         returns: tuple[ReturnItem, ...] = ()
         where: Optional[ExprNode] = None
+        order_by: tuple[OrderKey, ...] = ()
         for c in children[1:]:
             if isinstance(c, tuple) and c and c[0] == "__where__":
                 where = c[1]
             elif isinstance(c, tuple) and c and c[0] == "__return__":
                 returns = c[1]
-        return CypherAST(pattern=match_tree, where=where, returns=returns)
+            elif isinstance(c, tuple) and c and c[0] == "__order__":
+                order_by = c[1]
+        return CypherAST(pattern=match_tree, where=where, returns=returns, order_by=order_by)
 
     def match_clause(self, children):
         for c in children:
@@ -167,6 +170,43 @@ class _Compiler(Transformer):
         if not items:
             raise CypherError("RETURN requires at least one item")
         return ("__return__", items)
+
+    def order_clause(self, children):
+        keys = tuple(c for c in children if isinstance(c, OrderKey))
+        if not keys:
+            raise CypherError("ORDER BY requires at least one key")
+        return ("__order__", keys)
+
+    def cypher_order_key(self, children):
+        ref: Optional[str] = None
+        desc = False
+        nulls = "auto"
+        for c in children:
+            if isinstance(c, tuple) and c and c[0] == "__ref__":
+                ref = c[1]
+            elif isinstance(c, tuple) and c and c[0] == "__dir__":
+                desc = c[1]
+            elif isinstance(c, tuple) and c and c[0] == "__nulls__":
+                nulls = c[1]
+        if ref is None:
+            raise CypherError("ORDER BY key missing reference")
+        return OrderKey(field=ref, desc=desc, nulls=nulls)
+
+    @v_args(inline=True)
+    def order_ref_qual(self, qident):
+        return ("__ref__", str(qident))
+
+    @v_args(inline=True)
+    def order_ref_var(self, ident):
+        return ("__ref__", str(ident))
+
+    def direction_kw(self, children):
+        tok = children[0]
+        return ("__dir__", str(tok).upper() == "DESC")
+
+    def nulls_spec(self, children):
+        last = children[-1]
+        return ("__nulls__", "last" if str(last).upper() == "LAST" else "first")
 
     @v_args(inline=True)
     def r_count(self, _kw, ident):

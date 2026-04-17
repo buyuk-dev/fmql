@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Optional, Union
 
+from fmql.ordering import OrderKey
 from fmql.query import ExprNode
 
 
@@ -49,6 +50,7 @@ class CypherAST:
     pattern: Pattern
     where: Optional[ExprNode]
     returns: tuple[ReturnItem, ...]
+    order_by: tuple[OrderKey, ...] = ()
 
 
 @dataclass(frozen=True)

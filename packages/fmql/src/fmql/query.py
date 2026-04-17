@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Iterator, Optional, Union
 
 from fmql.filters import Predicate, match, parse_kwargs
+from fmql.ordering import OrderKey, apply_order
 from fmql.packet import Packet
 from fmql.types import PacketId, Resolver
 from fmql.workspace import Workspace
@@ -78,10 +79,32 @@ class IdSetStage:
 Stage = Union[FilterStage, FollowStage, SearchStage, IdSetStage]
 
 
+def _packet_field_value(packet: Packet, field: str) -> tuple[Any, bool]:
+    plain = packet.as_plain()
+    if field not in plain:
+        return (None, True)
+    return (plain[field], False)
+
+
+def _apply_packet_order(
+    ids: list[PacketId],
+    keys: tuple[OrderKey, ...],
+    workspace: Workspace,
+) -> list[PacketId]:
+    def extract(pid: PacketId, key: OrderKey) -> tuple[Any, bool]:
+        packet = workspace.packets.get(pid)
+        if packet is None:
+            return (None, True)
+        return _packet_field_value(packet, key.field)
+
+    return apply_order(ids, keys, extract)
+
+
 @dataclass(frozen=True)
 class Query:
     workspace: Workspace
     _stages: tuple[Stage, ...] = field(default_factory=tuple)
+    _order_by: tuple[OrderKey, ...] = field(default_factory=tuple)
 
     def where(self, **kwargs: Any) -> "Query":
         preds = parse_kwargs(kwargs)
@@ -89,10 +112,10 @@ class Query:
             return self
         nodes = tuple(PredNode(p) for p in preds)
         expr: ExprNode = nodes[0] if len(nodes) == 1 else AndNode(nodes)
-        return Query(self.workspace, self._stages + (FilterStage(expr),))
+        return Query(self.workspace, self._stages + (FilterStage(expr),), self._order_by)
 
     def where_expr(self, expr: ExprNode) -> "Query":
-        return Query(self.workspace, self._stages + (FilterStage(expr),))
+        return Query(self.workspace, self._stages + (FilterStage(expr),), self._order_by)
 
     def follow(
         self,
@@ -104,7 +127,7 @@ class Query:
         include_origin: bool = False,
     ) -> "Query":
         stage = FollowStage(field, depth, direction, resolver, include_origin)
-        return Query(self.workspace, self._stages + (stage,))
+        return Query(self.workspace, self._stages + (stage,), self._order_by)
 
     def all(self) -> "Query":
         return self
@@ -119,7 +142,7 @@ class Query:
     ) -> "Query":
         opts = tuple(sorted(options.items())) if options else None
         stage = SearchStage(index_name=index, query=query, location=location, options=opts)
-        return Query(self.workspace, self._stages + (stage,))
+        return Query(self.workspace, self._stages + (stage,), self._order_by)
 
     def cypher(self, text: str) -> "Query":
         from fmql.cypher.ast import ReturnVar
@@ -135,7 +158,20 @@ class Query:
             )
         result = compile_cypher_ast(ast, self.workspace)
         id_set = frozenset(row[0] for row in result.rows)
-        return Query(self.workspace, self._stages + (IdSetStage(ids=id_set),))
+        return Query(self.workspace, self._stages + (IdSetStage(ids=id_set),), self._order_by)
+
+    def order_by(
+        self,
+        field: str,
+        *,
+        desc: bool = False,
+        nulls: str = "auto",
+    ) -> "Query":
+        new_key = OrderKey(field=field, desc=desc, nulls=nulls)
+        return Query(self.workspace, self._stages, self._order_by + (new_key,))
+
+    def order_by_keys(self, keys: tuple[OrderKey, ...]) -> "Query":
+        return Query(self.workspace, self._stages, self._order_by + tuple(keys))
 
     def group_by(self, field: str) -> "GroupedQuery":
         from fmql.aggregation import GroupedQuery
@@ -180,6 +216,8 @@ class Query:
                     resolver=stage.resolver,
                     include_origin=stage.include_origin,
                 )
+        if self._order_by:
+            ids = _apply_packet_order(ids, self._order_by, self.workspace)
         return ids
 
     def __iter__(self) -> Iterator[Packet]:
