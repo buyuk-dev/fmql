@@ -10,7 +10,7 @@ plugins evolve together with atomic cross-package changes.
 | Package | Path | PyPI | Description |
 |---|---|---|---|
 | `fmql` | [packages/fmql](packages/fmql) | [pypi.org/project/fmql](https://pypi.org/project/fmql/) | Schemaless query engine and editor for directories of frontmatter files. |
-| `fmql-semantic` | [packages/fmql-semantic](packages/fmql-semantic) | — | Semantic search backend plugin. Pre-alpha stub; not published. |
+| `fmql-semantic` | [packages/fmql-semantic](packages/fmql-semantic) | [pypi.org/project/fmql-semantic](https://pypi.org/project/fmql-semantic/) | Semantic search backend plugin. Pre-alpha stub; not published. |
 
 See each package's README for usage.
 
