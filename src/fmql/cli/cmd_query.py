@@ -62,13 +62,18 @@ def query_cmd(
     search: Optional[str] = typer.Option(
         None, "--search", help="Narrow results to packets matching this search query."
     ),
-    index: str = typer.Option("text", "--index", help="Search index name (default: text)."),
+    index: str = typer.Option("grep", "--index", help="Search backend name (default: grep)."),
+    index_location: Optional[str] = typer.Option(
+        None,
+        "--index-location",
+        help="Location string for indexed backends (path / URI). Ignored by scan backends.",
+    ),
 ) -> None:
     try:
         ws = Workspace(path)
         q = compile_query(query, ws)
         if search is not None:
-            q = q.search(search, index=index)
+            q = q.search(search, index=index, location=index_location)
         if follow is not None:
             d = _parse_depth(depth)
             r = resolver_by_name(resolver) if resolver else None

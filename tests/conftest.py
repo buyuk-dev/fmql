@@ -7,7 +7,16 @@ from typing import Any, Callable
 import pytest
 from ruamel.yaml import YAML
 
+from fmql.search import clear_cache as _clear_search_cache
 from fmql.workspace import Workspace
+
+
+@pytest.fixture(autouse=True)
+def _search_registry_cache_reset():
+    _clear_search_cache()
+    yield
+    _clear_search_cache()
+
 
 _YAML = YAML(typ="rt", pure=True)
 _YAML.default_flow_style = False

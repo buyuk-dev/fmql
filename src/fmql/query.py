@@ -66,6 +66,8 @@ class FollowStage:
 class SearchStage:
     index_name: str
     query: str
+    location: Optional[str] = None
+    options: Optional[tuple[tuple[str, Any], ...]] = None
 
 
 @dataclass(frozen=True)
@@ -107,8 +109,16 @@ class Query:
     def all(self) -> "Query":
         return self
 
-    def search(self, query: str, *, index: str = "text") -> "Query":
-        stage = SearchStage(index_name=index, query=query)
+    def search(
+        self,
+        query: str,
+        *,
+        index: str = "grep",
+        location: Optional[str] = None,
+        options: Optional[dict] = None,
+    ) -> "Query":
+        opts = tuple(sorted(options.items())) if options else None
+        stage = SearchStage(index_name=index, query=query, location=location, options=opts)
         return Query(self.workspace, self._stages + (stage,))
 
     def cypher(self, text: str) -> "Query":
@@ -138,9 +148,23 @@ class Query:
             if isinstance(stage, FilterStage):
                 ids = [pid for pid in ids if _eval(stage.expr, self.workspace.packets[pid])]
             elif isinstance(stage, SearchStage):
-                from fmql.search import iter_search
+                from fmql.search import BackendKindError, get_backend, is_indexed
 
-                hits = set(iter_search(self.workspace, stage.index_name, stage.query))
+                backend = get_backend(stage.index_name)
+                opts = dict(stage.options) if stage.options else None
+                k = len(self.workspace.packets) or 1
+                if is_indexed(backend):
+                    location = stage.location or backend.default_location(self.workspace)
+                    if location is None:
+                        raise BackendKindError(
+                            f"backend {stage.index_name!r} is indexed and requires "
+                            f"an index location; pass location= to Query.search() "
+                            f"or --index-location on the CLI"
+                        )
+                    raw_hits = backend.query(stage.query, location, k=k, options=opts)
+                else:
+                    raw_hits = backend.query(stage.query, self.workspace, k=k, options=opts)
+                hits = {h.packet_id for h in raw_hits}
                 ids = [pid for pid in ids if pid in hits]
             elif isinstance(stage, IdSetStage):
                 ids = [pid for pid in ids if pid in stage.ids]

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fmql"
-version = "0.1.0"
+version = "0.2.0"
 description = "A schemaless query engine and editor for directories of frontmatter files."
 readme = "README.md"
 license = { text = "MIT" }
@@ -51,6 +51,9 @@ Documentation = "https://github.com/buyuk-dev/fmql#readme"
 
 [project.scripts]
 fmql = "fmql.cli.main:app"
+
+[project.entry-points."fmql.search_index"]
+grep = "fmql.search.backends.grep:GrepBackend"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/fmql"]

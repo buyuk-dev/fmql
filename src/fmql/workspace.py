@@ -7,7 +7,7 @@ from typing import Any, Iterable, Optional
 from fmql.errors import ParseError
 from fmql.packet import Packet
 from fmql.parser import parse_file
-from fmql.types import PacketId, Resolver, SearchIndex
+from fmql.types import PacketId, Resolver
 
 
 class Workspace:
@@ -18,7 +18,6 @@ class Workspace:
         glob: Iterable[str] = ("**/*.md",),
         resolvers: dict[str, Resolver] | None = None,
         default_resolver: Optional[Resolver] = None,
-        search_indexes: dict[str, SearchIndex] | None = None,
     ) -> None:
         self.root = Path(root).resolve()
         if not self.root.is_dir():
@@ -26,7 +25,6 @@ class Workspace:
         self.glob: tuple[str, ...] = tuple(glob)
         self.packets: dict[PacketId, Packet] = {}
         self.resolvers: dict[str, Resolver] = dict(resolvers or {})
-        self.search_indexes: dict[str, SearchIndex] = dict(search_indexes or {})
         if default_resolver is None:
             from fmql.resolvers import RelativePathResolver
 

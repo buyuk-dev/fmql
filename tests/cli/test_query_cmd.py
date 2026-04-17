@@ -64,7 +64,7 @@ def test_version_cmd():
     runner = CliRunner()
     result = runner.invoke(app, ["version"])
     assert result.exit_code == 0
-    assert result.stdout.strip() == "0.1.0"
+    assert result.stdout.strip() == "0.2.0"
 
 
 # ---- follow ----
@@ -200,7 +200,7 @@ def test_query_search_narrows(tmp_path: Path):
     assert lines == ["tasks/a.md"]
 
 
-def test_query_search_explicit_text_index(tmp_path: Path):
+def test_query_search_explicit_grep_index(tmp_path: Path):
     _write_ws(tmp_path)
     (tmp_path / "tasks/a.md").write_text(
         "---\nstatus: active\npriority: 3\n---\nbanana\n",
@@ -209,7 +209,7 @@ def test_query_search_explicit_text_index(tmp_path: Path):
     runner = CliRunner()
     result = runner.invoke(
         app,
-        ["query", str(tmp_path), "*", "--search", "banana", "--index", "text"],
+        ["query", str(tmp_path), "*", "--search", "banana", "--index", "grep"],
     )
     assert result.exit_code == 0, result.output
     lines = [ln for ln in result.stdout.splitlines() if ln.strip()]

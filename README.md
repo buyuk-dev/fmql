@@ -55,7 +55,7 @@ for packet in q:
 - **Aggregation** — `group_by(...).aggregate(Count, Sum, Avg, Min, Max)`.
 - **Describe** — workspace introspection: observed fields, types, distinct-value samples.
 - **Cypher subset** — graph patterns for dependency chains, cycle detection, multi-hop traversal.
-- **Pluggable search** — minimal `SearchIndex` protocol; ships with a text-scan fallback.
+- **Pluggable search** — third-party backends register via Python entry points (`fmql.search_index`). Ships with a `grep` scan backend; third-party packages can add indexed backends (`fmql-fts`, `fmql-semantic`, …).
 
 ## CLI reference
 
@@ -69,13 +69,16 @@ for packet in q:
 | `toggle` | Toggle boolean fields | `fmql toggle ./tasks/task-42.md flagged` |
 | `describe` | Workspace introspection | `fmql describe ./project` |
 | `cypher` | Graph pattern query (Cypher subset) | `fmql cypher ./project 'MATCH (a)-[:blocked_by]->(b) RETURN a, b'` |
+| `search` | Run a search backend against a workspace/index | `fmql search 'alice' --workspace ./project` |
+| `index` | Build an index for an indexed backend | `fmql index ./project --backend semantic --out ./project/.fmql/semantic` |
+| `list-backends` | Enumerate discovered search backends | `fmql list-backends` |
 
 Common flags:
 
 - `--format {paths,json,rows}` — output format (default: `paths` for `query`, `rows` for `cypher`).
 - `--follow FIELD`, `--depth N|'*'`, `--direction {forward,reverse}` — traversal on `query`.
 - `--resolver {path,uuid,slug}` — reference resolution strategy for traversal/Cypher.
-- `--search QUERY`, `--index NAME` — pluggable search stage.
+- `--search QUERY`, `--index NAME`, `--index-location LOCATION` — pluggable search stage (backend default: `grep`).
 - `--dry-run`, `--yes` — preview or auto-confirm for edit commands.
 - `--workspace ROOT` — explicit workspace root when piping paths into edit commands.
 
@@ -259,6 +262,45 @@ Value coercion from CLI strings: `true`/`false` → bool; integers and floats pa
 **Safety model.** Bulk edits print a unified diff and prompt before writing. `--dry-run` shows the diff without writing; `--yes` skips the prompt. When stdin is piped (`fmql query ... | fmql set ...`), the prompt reopens `/dev/tty` — on systems without a tty (CI, containers), pass `--yes`.
 
 **Formatting.** fmql re-emits edited YAML with 2-space mapping indent and 4-space sequence offset (ruamel defaults with explicit offset). Files that don't conform can still be parsed; only edited files are re-emitted, and untouched keys round-trip byte-for-byte.
+
+## Writing a search backend
+
+Third-party packages can register search backends via the `fmql.search_index` entry-point group. Core makes no assumptions about what an index is or where it lives — the backend decides.
+
+Pick one of two protocols:
+
+- `ScanSearch` — scans the workspace at query time. No build step.
+- `IndexedSearch` — builds a persistent index that `fmql index` rebuilds and `fmql search --index LOCATION` queries.
+
+Minimal scan backend:
+
+```python
+from fmql.search import BackendInfo, ScanSearch, SearchHit
+
+class MyBackend:
+    name = "mine"
+
+    def query(self, text, workspace, *, k=10, options=None):
+        hits = []
+        for pid, packet in workspace.packets.items():
+            if text.lower() in packet.body.lower():
+                hits.append(SearchHit(packet_id=pid, score=1.0))
+                if len(hits) >= k:
+                    break
+        return hits
+
+    def info(self):
+        return BackendInfo(name=self.name, version="0.1.0", kind="scan")
+```
+
+Register in your `pyproject.toml`:
+
+```toml
+[project.entry-points."fmql.search_index"]
+mine = "my_package:MyBackend"
+```
+
+After `pip install`, `fmql list-backends` will pick it up and `fmql search "text" --backend mine --workspace ./ws` will invoke it. For indexed backends, also implement `parse_location`, `default_location`, and `build`; `fmql.search.conformance` exposes reusable assertions you can drive from your own tests. See [docs/plugins_arch.md](docs/plugins_arch.md) for the full protocol.
 
 ## Development
 

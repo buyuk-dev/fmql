@@ -6,6 +6,7 @@ from fmql import __version__
 from fmql.cli.cmd_append import append_cmd
 from fmql.cli.cmd_cypher import cypher_cmd
 from fmql.cli.cmd_describe import describe_cmd
+from fmql.cli.cmd_index import index_cmd, list_backends_cmd, search_cmd
 from fmql.cli.cmd_query import query_cmd
 from fmql.cli.cmd_remove import remove_cmd
 from fmql.cli.cmd_rename import rename_cmd
@@ -26,6 +27,9 @@ app.command(name="append", help="Append to list-valued fields (field=value).")(a
 app.command(name="toggle", help="Toggle boolean fields.")(toggle_cmd)
 app.command(name="describe", help="Describe a workspace of frontmatter files.")(describe_cmd)
 app.command(name="cypher", help="Run a Cypher-subset pattern query.")(cypher_cmd)
+app.command(name="search", help="Search a workspace or index.")(search_cmd)
+app.command(name="index", help="Build a search index for a workspace.")(index_cmd)
+app.command(name="list-backends", help="List discovered search backends.")(list_backends_cmd)
 
 
 @app.command(name="version", help="Print fmql version and exit.")
