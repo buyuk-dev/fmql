@@ -1,4 +1,4 @@
-# fmql monorepo
+# FMQL
 
 Home of [`fmql`](https://pypi.org/project/fmql/) and related packages. Each
 package under `packages/*` is fully self-contained (own version, own README,
