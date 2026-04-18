@@ -9,13 +9,29 @@ A schemaless query engine and editor for directories of frontmatter (markdown + 
 
 Point it at any directory of markdown/YAML files. Query with filters, traversal, aggregation, and graph patterns. Edit properties across single files or entire result sets. No configuration, no schema, no setup.
 
+![fmql in motion: cat a frontmatter task file, then run `fmql search … | fzf | fmql append tags=tech-debt` to retrieve tech-debt candidates, toggle a few with fzf, and bulk-tag them with a diff preview.](docs/hero.gif)
+
 ## Installation
 
 ```bash
 pip install fmql
 ```
 
-From source:
+### System-wide CLI via pipx
+
+If you want `fmql` on your `PATH` across projects without managing a per-repo venv, use [`pipx`](https://pipx.pypa.io):
+
+```bash
+pipx install fmql
+```
+
+pipx installs `fmql` into an isolated environment and exposes the CLI on your shell. Search backends and other plugins register via Python entry points, so they must live in fmql's pipx env. Add them with `pipx inject` (not `pipx install` — plugin libraries have no CLI of their own):
+
+```bash
+pipx inject fmql fmql-semantic    # example: add the semantic search backend
+```
+
+### From source
 
 ```bash
 git clone https://github.com/buyuk-dev/fmql.git

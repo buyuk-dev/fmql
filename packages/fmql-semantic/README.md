@@ -14,10 +14,61 @@ Hybrid semantic search backend plugin for [`fmql`](https://pypi.org/project/fmql
 pip install fmql-semantic
 ```
 
-`fmql-semantic` requires a Python build with `sqlite3` loadable-extension support
-(macOS/Linux/Windows builds from python.org, `pyenv`, `uv`, and official Docker
-images all qualify; the macOS system Python at `/usr/bin/python3` does not). If
-the extension loader is unavailable, the backend fails fast with a clear error.
+`fmql-semantic` requires a Python build with `sqlite3` loadable-extension support.
+Most Python installs qualify: Linux distro Python, Windows Python, `uv`'s bundled
+Python, Homebrew's `python`, the python.org macOS installer, conda, and official
+Docker images. If the extension loader is unavailable, the backend fails fast
+with a clear error.
+
+### With pipx
+
+`fmql-semantic` is a plugin library (no CLI of its own), so `pipx install
+fmql-semantic` does not work. Inject it into `fmql`'s pipx env instead:
+
+```sh
+pipx inject fmql fmql-semantic
+```
+
+On macOS specifically, pin pipx to Homebrew's Python to sidestep the sqlite
+loadable-extension problem described below:
+
+```sh
+brew install python@3.12
+pipx install --python /opt/homebrew/bin/python3.12 fmql
+pipx inject fmql fmql-semantic
+```
+
+Or set `PIPX_DEFAULT_PYTHON=/opt/homebrew/bin/python3.12` in `~/.zshrc` so all
+future `pipx install` calls use Homebrew Python automatically.
+
+### macOS + pyenv: extra setup required
+
+Default `pyenv install` on macOS links Python against Apple's system sqlite
+(`/usr/lib/libsqlite3.dylib`), which is compiled without loadable-extension
+support for sandboxing reasons. Same is true of the macOS system Python at
+`/usr/bin/python3`. In both cases `connection.enable_load_extension(True)`
+raises `NotSupportedError` and fmql-semantic fails fast.
+
+To use fmql-semantic on pyenv-installed Python on macOS, point pyenv at
+Homebrew's sqlite (which has loadable extensions enabled) and reinstall:
+
+```sh
+brew install sqlite
+
+export LDFLAGS="-L$(brew --prefix sqlite)/lib"
+export CPPFLAGS="-I$(brew --prefix sqlite)/include"
+export PKG_CONFIG_PATH="$(brew --prefix sqlite)/lib/pkgconfig"
+
+pyenv uninstall <version>
+pyenv install <version>
+
+python -c "import sqlite3; sqlite3.connect(':memory:').enable_load_extension(True); print('OK')"
+```
+
+The `LDFLAGS`/`CPPFLAGS` exports must be set while `pyenv install` runs; they
+tell Python's build to prefer Homebrew's sqlite over Apple's. Once the `OK`
+check passes, recreate your venv and reinstall `fmql-semantic`. This is a
+one-time setup per pyenv Python version.
 
 ## Configure
 
