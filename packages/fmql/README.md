@@ -9,7 +9,7 @@ A schemaless query engine and editor for directories of frontmatter (markdown + 
 
 Point it at any directory of markdown/YAML files. Query with filters, traversal, aggregation, and graph patterns. Edit properties across single files or entire result sets. No configuration, no schema, no setup.
 
-![fmql in motion: cat a frontmatter task file, then run `fmql search … | fzf | fmql append tags=tech-debt` to retrieve tech-debt candidates, toggle a few with fzf, and bulk-tag them with a diff preview.](docs/hero.gif)
+![fmql in motion: cat a frontmatter task file, then run `fmql search … | fzf | fmql append tags=tech-debt` to retrieve tech-debt candidates, toggle a few with fzf, and bulk-tag them with a diff preview.](https://raw.githubusercontent.com/buyuk-dev/fmql/main/packages/fmql/docs/hero.gif)
 
 ## Installation
 
@@ -302,6 +302,14 @@ Value coercion from CLI strings: `true`/`false` → bool; integers and floats pa
 
 **Formatting.** fmql re-emits edited YAML with 2-space mapping indent and 4-space sequence offset (ruamel defaults with explicit offset). Files that don't conform can still be parsed; only edited files are re-emitted, and untouched keys round-trip byte-for-byte.
 
+## Plugins
+
+Official plugins live alongside core in the [fmql monorepo](https://github.com/buyuk-dev/fmql/tree/main/packages). Third-party plugins are discovered via the `fmql.search_index` entry-point group — see [Writing a search backend](#writing-a-search-backend).
+
+| Package | PyPI | Description |
+|---|---|---|
+| [`fmql-semantic`](https://github.com/buyuk-dev/fmql/tree/main/packages/fmql-semantic) | [pypi.org/project/fmql-semantic](https://pypi.org/project/fmql-semantic/) | Hybrid semantic search backend: dense embeddings (LiteLLM + `sqlite-vec`), sparse BM25 (SQLite FTS5), RRF fusion, optional reranking. |
+
 ## Writing a search backend
 
 Third-party packages can register search backends via the `fmql.search_index` entry-point group. Core makes no assumptions about what an index is or where it lives — the backend decides.
@@ -339,7 +347,7 @@ Register in your `pyproject.toml`:
 mine = "my_package:MyBackend"
 ```
 
-After `pip install`, `fmql list-backends` will pick it up and `fmql search "text" --backend mine --workspace ./ws` will invoke it. For indexed backends, also implement `parse_location`, `default_location`, and `build`; `fmql.search.conformance` exposes reusable assertions you can drive from your own tests. See [docs/plugins_arch.md](docs/plugins_arch.md) for the full protocol.
+After `pip install`, `fmql list-backends` will pick it up and `fmql search "text" --backend mine --workspace ./ws` will invoke it. For indexed backends, also implement `parse_location`, `default_location`, and `build`; `fmql.search.conformance` exposes reusable assertions you can drive from your own tests.
 
 ## Development
 
@@ -358,6 +366,5 @@ make format  # black
 ## Links
 
 - [Blog post](https://www.buyuk.io/blog/fmql-launch/) — introduction and motivation.
-- [Design document](docs/design.md) — rationale, comparisons, target surface.
 - [LICENSE](LICENSE) — MIT.
 - [GitHub](https://github.com/buyuk-dev/fmql) — source, issues, releases.
