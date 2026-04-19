@@ -14,3 +14,4 @@
 - [ ] Pattern matching for inferring document type from its structure
 - [ ] Frontmatter -> json, yaml serialization and deserialization (by packaging frontmatter into the "header" and markdown body into "body" prop).
 - [ ] filesystem level operations (inspecting filesystem metadata, filesystem ops: mv, cp, rm, ls, etc...)
+- Filesystem level operations could automatically doctor links when files move around or are deleted.

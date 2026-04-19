@@ -357,6 +357,7 @@ make format  # black
 
 ## Links
 
+- [Blog post](https://www.buyuk.io/blog/fmql-launch/) — introduction and motivation.
 - [Design document](docs/design.md) — rationale, comparisons, target surface.
 - [LICENSE](LICENSE) — MIT.
 - [GitHub](https://github.com/buyuk-dev/fmql) — source, issues, releases.
