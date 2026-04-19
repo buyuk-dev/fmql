@@ -1,10 +1,21 @@
 from __future__ import annotations
 
 import asyncio
+import warnings
 from typing import Sequence
 
 from fmql.search.errors import BackendUnavailableError
 from fmql_semantic.config import Config
+
+# LiteLLM's LoggingWorker schedules an async success handler from a sync code
+# path; the coroutine is GC'd unawaited when our event loop closes, producing a
+# benign RuntimeWarning on every indexing run. Silence that one message only.
+warnings.filterwarnings(
+    "ignore",
+    message=r"coroutine 'Logging\.async_success_handler' was never awaited",
+    category=RuntimeWarning,
+    module=r"litellm.*",
+)
 
 
 async def _embed_batch(
