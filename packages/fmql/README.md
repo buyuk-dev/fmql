@@ -358,13 +358,3 @@ make lint    # ruff + black --check
 make cov     # pytest with coverage (fails under 84%)
 make format  # black
 ```
-
-## Status
-
-**v0.1.0** — first public release. All five design phases shipped: read path (filters, qlang, Python API), edit path (surgical YAML edits + bulk pipe), relationships & traversal (`follow` + resolvers), aggregation & describe, and the Cypher subset with pluggable search.
-
-## Links
-
-- [Blog post](https://www.buyuk.io/blog/fmql-launch/) — introduction and motivation.
-- [LICENSE](LICENSE) — MIT.
-- [GitHub](https://github.com/buyuk-dev/fmql) — source, issues, releases.
