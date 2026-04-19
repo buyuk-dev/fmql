@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Iterable, Optional
+
+import typer
 
 from fmql.types import Resolver
 from fmql.workspace import Workspace
@@ -27,3 +29,19 @@ def diagnose_resolver_mismatch(
             f"possible resolver mismatch (try --resolver uuid|slug|path)"
         )
     return None
+
+
+def emit_resolver_mismatch_hints(
+    workspace: Workspace,
+    fields: Iterable[str],
+    resolver: Optional[Resolver] = None,
+) -> None:
+    seen: set[str] = set()
+    for field in fields:
+        if field in seen:
+            continue
+        seen.add(field)
+        eff_resolver = resolver or workspace.resolvers.get(field) or workspace.default_resolver
+        hint = diagnose_resolver_mismatch(workspace, field, eff_resolver)
+        if hint is not None:
+            typer.echo(hint, err=True)

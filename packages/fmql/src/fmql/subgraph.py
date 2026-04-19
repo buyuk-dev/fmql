@@ -51,6 +51,11 @@ def collect_subgraph(
 
     origin_set: set[PacketId] = {pid for pid in origins if pid in workspace.packets}
 
+    eff_resolvers = {
+        field: resolver or workspace.resolvers.get(field) or workspace.default_resolver
+        for field in field_list
+    }
+
     visited: set[PacketId] = set(origin_set)
     frontier: set[PacketId] = set(origin_set)
     edges: set[Edge] = set()
@@ -59,10 +64,9 @@ def collect_subgraph(
         next_frontier: set[PacketId] = set()
         for pid in frontier:
             for field in field_list:
-                eff_resolver = (
-                    resolver or workspace.resolvers.get(field) or workspace.default_resolver
-                )
-                for source, target in _edges_for(workspace, pid, field, eff_resolver, direction):
+                for source, target in _edges_for(
+                    workspace, pid, field, eff_resolvers[field], direction
+                ):
                     edges.add(Edge(source=source, target=target, field=field))
                     neighbor = target if direction == "forward" else source
                     if neighbor in visited:

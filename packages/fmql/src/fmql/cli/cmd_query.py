@@ -8,7 +8,7 @@ from typing import Optional, Union
 
 import typer
 
-from fmql.diagnostics import diagnose_resolver_mismatch
+from fmql.diagnostics import emit_resolver_mismatch_hints
 from fmql.errors import FmqlError
 from fmql.qlang import compile_query
 from fmql.resolvers import resolver_by_name
@@ -99,11 +99,6 @@ def query_cmd(
             payload = {"id": packet.id, "frontmatter": packet.as_plain()}
             typer.echo(json.dumps(payload, default=_json_default, ensure_ascii=False))
 
-    if follow is not None and not packets:
-        seeds = seeds_q.ids()
-        if seeds:
-            r = resolver_by_name(resolver) if resolver else None
-            eff_resolver = r or ws.resolvers.get(follow) or ws.default_resolver
-            hint = diagnose_resolver_mismatch(ws, follow, eff_resolver)
-            if hint is not None:
-                typer.echo(hint, err=True)
+    if follow is not None and not packets and seeds_q.ids():
+        r = resolver_by_name(resolver) if resolver else None
+        emit_resolver_mismatch_hints(ws, [follow], resolver=r)

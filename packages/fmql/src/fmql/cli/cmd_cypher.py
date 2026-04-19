@@ -9,7 +9,7 @@ from typing import Optional
 import typer
 
 from fmql.cypher import compile_cypher_ast, parse_cypher
-from fmql.diagnostics import diagnose_resolver_mismatch
+from fmql.diagnostics import emit_resolver_mismatch_hints
 from fmql.errors import FmqlError
 from fmql.resolvers import resolver_by_name
 from fmql.workspace import Workspace
@@ -75,12 +75,4 @@ def cypher_cmd(
                 typer.echo(json.dumps(payload, default=_json_default, ensure_ascii=False))
 
     if not result.is_scalar and not result.rows:
-        seen: set[str] = set()
-        for rel in ast.pattern.rels:
-            if rel.field in seen:
-                continue
-            seen.add(rel.field)
-            eff_resolver = ws.resolvers.get(rel.field) or ws.default_resolver
-            hint = diagnose_resolver_mismatch(ws, rel.field, eff_resolver)
-            if hint is not None:
-                typer.echo(hint, err=True)
+        emit_resolver_mismatch_hints(ws, (rel.field for rel in ast.pattern.rels))

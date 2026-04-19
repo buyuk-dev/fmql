@@ -8,7 +8,7 @@ from typing import List, Optional, Union
 
 import typer
 
-from fmql.diagnostics import diagnose_resolver_mismatch
+from fmql.diagnostics import emit_resolver_mismatch_hints
 from fmql.errors import FmqlError
 from fmql.qlang import compile_query
 from fmql.resolvers import resolver_by_name
@@ -102,12 +102,4 @@ def subgraph_cmd(
     )
 
     if not sg.edges and seeds:
-        seen: set[str] = set()
-        for field in fields:
-            if field in seen:
-                continue
-            seen.add(field)
-            eff_resolver = r or ws.resolvers.get(field) or ws.default_resolver
-            hint = diagnose_resolver_mismatch(ws, field, eff_resolver)
-            if hint is not None:
-                typer.echo(hint, err=True)
+        emit_resolver_mismatch_hints(ws, fields, resolver=r)
