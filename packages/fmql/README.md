@@ -46,7 +46,7 @@ Requires Python 3.11+.
 CLI:
 
 ```bash
-fmql query ./project 'status = "active" AND priority > 2'
+fmql query ./notes 'type = "task" AND status != "done"'
 fmql query ./project 'due_date < today' --format json
 ```
 
@@ -55,8 +55,8 @@ Python:
 ```python
 from fmql import Workspace, Query
 
-ws = Workspace("./project")
-q = Query(ws).where(status="active", priority__gt=2)
+ws = Workspace("./notes")
+q = Query(ws).where(type="task", status__ne="done")
 for packet in q:
     print(packet.id)
 ```
