@@ -2,6 +2,12 @@
 
 All notable changes to this package will be documented in this file.
 
+## Unreleased
+
+### Changed
+
+- `--option env=PATH` now publishes every key from the dotenv file to `os.environ` (via `setdefault`) so LiteLLM provider credentials (`OPENAI_API_KEY`, `AZURE_API_*`, …) are picked up. `FMQL_*` keys still drive the typed config; existing shell env vars are never overridden.
+
 ## [0.1.0] - 2026-04-17
 
 ### Added

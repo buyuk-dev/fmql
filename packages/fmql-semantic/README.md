@@ -93,7 +93,11 @@ precedence:
 | `FMQL_RERANKER_TOP_N` | Candidates sent to reranker (default 50). |
 
 Standard LiteLLM provider env vars (`OPENAI_API_KEY`, `VOYAGE_API_KEY`,
-`OLLAMA_API_BASE`, …) are read by LiteLLM directly.
+`OLLAMA_API_BASE`, …) are read by LiteLLM directly from the process
+environment. A dotenv file passed via `--option env=path/to/.env` also
+publishes its non-`FMQL_*` keys into `os.environ` (without overriding
+values already exported by the shell), so the same file can carry both
+`FMQL_*` settings and provider credentials.
 
 ### `--option` keys
 

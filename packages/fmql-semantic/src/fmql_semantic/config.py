@@ -153,6 +153,8 @@ def resolve_config(options: dict | None, *, kind: Literal["build", "query"]) -> 
         for env_key, field in _ENV_MAP.items():
             if env_key in parsed:
                 layered[field] = _coerce(field, parsed[env_key])
+        for key, value in parsed.items():
+            os.environ.setdefault(key, value)
 
     for opt_key, value in options.items():
         field = _OPT_MAP[opt_key]
