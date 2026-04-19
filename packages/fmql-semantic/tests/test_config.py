@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -39,6 +40,33 @@ def test_dotenv_layered_between_env_and_options(monkeypatch, tmp_path: Path):
 def test_missing_dotenv_errors():
     with pytest.raises(ConfigError, match="dotenv file not found"):
         resolve_config({"env": "/nonexistent/file.env"}, kind="build")
+
+
+@pytest.fixture
+def env_snapshot():
+    saved = dict(os.environ)
+    yield
+    for key in list(os.environ):
+        if key not in saved:
+            del os.environ[key]
+    for key, value in saved.items():
+        os.environ[key] = value
+
+
+def test_dotenv_publishes_provider_vars_to_environ(env_snapshot, tmp_path: Path):
+    os.environ.pop("OPENAI_API_KEY", None)
+    env_file = tmp_path / ".env"
+    env_file.write_text("FMQL_EMBEDDING_MODEL=m\nOPENAI_API_KEY=foo\n")
+    resolve_config({"env": str(env_file)}, kind="build")
+    assert os.environ["OPENAI_API_KEY"] == "foo"
+
+
+def test_dotenv_does_not_override_existing_environ(env_snapshot, tmp_path: Path):
+    os.environ["OPENAI_API_KEY"] = "shell"
+    env_file = tmp_path / ".env"
+    env_file.write_text("FMQL_EMBEDDING_MODEL=m\nOPENAI_API_KEY=dotenv\n")
+    resolve_config({"env": str(env_file)}, kind="build")
+    assert os.environ["OPENAI_API_KEY"] == "shell"
 
 
 def test_unknown_option_for_build():
