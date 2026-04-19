@@ -187,6 +187,74 @@ def test_query_follow_include_origin(tmp_path: Path):
     assert lines == ["a.md", "b.md", "c.md"]
 
 
+def test_query_follow_zero_results_emits_resolver_mismatch_hint(tmp_path: Path):
+    _write_blocked_ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "query",
+            str(tmp_path),
+            'uuid = "c"',
+            "--follow",
+            "blocked_by",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert result.stdout.strip() == ""
+    assert "hint:" in result.stderr
+    assert "blocked_by" in result.stderr
+    assert "resolver mismatch" in result.stderr
+
+
+def test_query_follow_zero_results_hint_suppressed_with_matching_resolver(tmp_path: Path):
+    _write_blocked_ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "query",
+            str(tmp_path),
+            'uuid = "c"',
+            "--follow",
+            "blocked_by",
+            "--resolver",
+            "uuid",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "hint:" not in result.stderr
+
+
+def test_query_follow_empty_seeds_no_hint(tmp_path: Path):
+    _write_blocked_ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "query",
+            str(tmp_path),
+            'uuid = "no-such-packet"',
+            "--follow",
+            "blocked_by",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert result.stdout.strip() == ""
+    assert "hint:" not in result.stderr
+
+
+def test_query_without_follow_no_hint_on_zero_results(tmp_path: Path):
+    _write_blocked_ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["query", str(tmp_path), 'uuid = "nope"'],
+    )
+    assert result.exit_code == 0, result.output
+    assert "hint:" not in result.stderr
+
+
 def test_query_follow_invalid_depth(tmp_path: Path):
     _write_blocked_ws(tmp_path)
     runner = CliRunner()

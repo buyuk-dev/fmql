@@ -8,6 +8,13 @@ from typer.testing import CliRunner
 from fmql.cli.main import app
 
 
+def _write_uuid_refs(root: Path) -> None:
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "a.md").write_text("---\nuuid: a\nblocked_by: b\n---\n", encoding="utf-8")
+    (root / "b.md").write_text("---\nuuid: b\nblocked_by: c\n---\n", encoding="utf-8")
+    (root / "c.md").write_text("---\nuuid: c\n---\n", encoding="utf-8")
+
+
 def _write_cycle_by_path(root: Path) -> None:
     root.mkdir(parents=True, exist_ok=True)
     (root / "a.md").write_text("---\nnext: b.md\n---\n", encoding="utf-8")
@@ -130,3 +137,38 @@ def test_cypher_reverse_edge_exits_2(tmp_path: Path):
         ["cypher", str(tmp_path), "MATCH (a)<-[:next]-(b) RETURN a"],
     )
     assert result.exit_code == 2
+
+
+def test_cypher_zero_rows_emits_resolver_mismatch_hint(tmp_path: Path):
+    _write_uuid_refs(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "cypher",
+            str(tmp_path),
+            "MATCH (a)-[:blocked_by]->(b) RETURN a, b",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert result.stdout == ""
+    assert "hint:" in result.stderr
+    assert "blocked_by" in result.stderr
+    assert "resolver mismatch" in result.stderr
+
+
+def test_cypher_zero_rows_hint_suppressed_with_matching_resolver(tmp_path: Path):
+    _write_uuid_refs(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "cypher",
+            str(tmp_path),
+            "MATCH (a)-[:blocked_by]->(b) RETURN a, b",
+            "--resolver",
+            "uuid",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "hint:" not in result.stderr

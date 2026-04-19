@@ -10,7 +10,7 @@ from fmql.cypher.ast import (
     ReturnVar,
 )
 from fmql.cypher.compile import parse_cypher
-from fmql.cypher.executor import compile_cypher
+from fmql.cypher.executor import compile_cypher, compile_cypher_ast
 
 __all__ = [
     "CypherAST",
@@ -23,5 +23,6 @@ __all__ = [
     "ReturnItem",
     "ReturnVar",
     "compile_cypher",
+    "compile_cypher_ast",
     "parse_cypher",
 ]

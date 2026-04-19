@@ -1,7 +1,5 @@
 # TODO
 
-- Hint on stderr when a Cypher / `--follow` query returns zero rows but the field is set on some docs (resolver mismatch).
-- `fmql subgraph` subcommand (or Cypher path variable `p = ...`) to return full subgraphs as `{nodes, edges}`.
 - Pseudo-field `a._id` / `a._path` in Cypher `WHERE` so start nodes can be pinned by packet id without frontmatter bookkeeping.
 - Allow string / number literals as `RETURN` items (e.g. `RETURN a.title, "|", b.title`).
 - Visible row separator in `rows` format (tab is invisible); `--separator` option or better default.
@@ -11,13 +9,9 @@
 
 - [ ] fmql-semantic (not a blocker): that LiteLLM RuntimeWarning at the end of every indexing run is user-visible noise. Two ways to clean it up — either bump the pinned LiteLLM version (newer versions have fixed some of these async-logging paths) or suppress it explicitly around the embedding call
   
-  
-
 
 ## Wishlist
 
 - [ ] Pattern matching for inferring document type from its structure
 - [ ] Frontmatter -> json, yaml serialization and deserialization (by packaging frontmatter into the "header" and markdown body into "body" prop).
 - [ ] filesystem level operations (inspecting filesystem metadata, filesystem ops: mv, cp, rm, ls, etc...)
-
-
