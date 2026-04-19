@@ -8,7 +8,8 @@ from typing import Optional
 
 import typer
 
-from fmql.cypher import compile_cypher
+from fmql.cypher import compile_cypher_ast, parse_cypher
+from fmql.diagnostics import diagnose_resolver_mismatch
 from fmql.errors import FmqlError
 from fmql.resolvers import resolver_by_name
 from fmql.workspace import Workspace
@@ -52,7 +53,8 @@ def cypher_cmd(
     try:
         default_r = resolver_by_name(resolver) if resolver else None
         ws = Workspace(path, default_resolver=default_r)
-        result = compile_cypher(query, ws)
+        ast = parse_cypher(query)
+        result = compile_cypher_ast(ast, ws)
     except FmqlError as e:
         typer.echo(f"error: {e}", err=True)
         raise typer.Exit(code=2)
@@ -71,3 +73,14 @@ def cypher_cmd(
             for row in result.rows:
                 payload = {"columns": cols, "row": list(row)}
                 typer.echo(json.dumps(payload, default=_json_default, ensure_ascii=False))
+
+    if not result.is_scalar and not result.rows:
+        seen: set[str] = set()
+        for rel in ast.pattern.rels:
+            if rel.field in seen:
+                continue
+            seen.add(rel.field)
+            eff_resolver = ws.resolvers.get(rel.field) or ws.default_resolver
+            hint = diagnose_resolver_mismatch(ws, rel.field, eff_resolver)
+            if hint is not None:
+                typer.echo(hint, err=True)
