@@ -1,4 +1,4 @@
-# fmql — FrontMatter Utilities
+# FMQL - Schemaless Markdown + YAML FrontMatter Query Language
 
 A schemaless query engine and editor for directories of frontmatter (markdown + YAML) files.
 
