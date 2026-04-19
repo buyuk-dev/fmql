@@ -73,6 +73,14 @@ for packet in q:
 - **Cypher subset** — graph patterns for dependency chains, cycle detection, multi-hop traversal.
 - **Pluggable search** — third-party backends register via Python entry points (`fmql.search_index`). Ships with a `grep` scan backend; third-party packages can add indexed backends (`fmql-fts`, `fmql-semantic`, …).
 
+## Plugins
+
+Official plugins live alongside core in the [fmql monorepo](https://github.com/buyuk-dev/fmql/tree/main/packages). Third-party plugins are discovered via the `fmql.search_index` entry-point group — see [Writing a search backend](#writing-a-search-backend).
+
+| Package | PyPI | Description |
+|---|---|---|
+| [`fmql-semantic`](https://github.com/buyuk-dev/fmql/tree/main/packages/fmql-semantic) | [pypi.org/project/fmql-semantic](https://pypi.org/project/fmql-semantic/) | Hybrid semantic search backend: dense embeddings (LiteLLM + `sqlite-vec`), sparse BM25 (SQLite FTS5), RRF fusion, optional reranking. |
+
 ## CLI reference
 
 | Command | Purpose | Example |
@@ -301,14 +309,6 @@ Value coercion from CLI strings: `true`/`false` → bool; integers and floats pa
 **Safety model.** Bulk edits print a unified diff and prompt before writing. `--dry-run` shows the diff without writing; `--yes` skips the prompt. When stdin is piped (`fmql query ... | fmql set ...`), the prompt reopens `/dev/tty` — on systems without a tty (CI, containers), pass `--yes`.
 
 **Formatting.** fmql re-emits edited YAML with 2-space mapping indent and 4-space sequence offset (ruamel defaults with explicit offset). Files that don't conform can still be parsed; only edited files are re-emitted, and untouched keys round-trip byte-for-byte.
-
-## Plugins
-
-Official plugins live alongside core in the [fmql monorepo](https://github.com/buyuk-dev/fmql/tree/main/packages). Third-party plugins are discovered via the `fmql.search_index` entry-point group — see [Writing a search backend](#writing-a-search-backend).
-
-| Package | PyPI | Description |
-|---|---|---|
-| [`fmql-semantic`](https://github.com/buyuk-dev/fmql/tree/main/packages/fmql-semantic) | [pypi.org/project/fmql-semantic](https://pypi.org/project/fmql-semantic/) | Hybrid semantic search backend: dense embeddings (LiteLLM + `sqlite-vec`), sparse BM25 (SQLite FTS5), RRF fusion, optional reranking. |
 
 ## Writing a search backend
 
