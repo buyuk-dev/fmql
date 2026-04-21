@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.3] - 2026-04-21
+
+### Fixed
+
+- `fmql version` (and `fmql.__version__`) now report the installed package version instead of a hand-maintained literal that had drifted (0.2.2 shipped still reporting `0.2.1`). `__version__` is now derived from `importlib.metadata.version("fmql")` so the single source of truth is `pyproject.toml`.
+
 ## [0.2.2] - 2026-04-21
 
 ### Added
