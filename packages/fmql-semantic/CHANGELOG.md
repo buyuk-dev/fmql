@@ -2,6 +2,12 @@
 
 All notable changes to this package will be documented in this file.
 
+## [0.1.2] - 2026-04-21
+
+### Fixed
+
+- `fmql_semantic.__version__` now reports the installed package version instead of a hand-maintained literal that had drifted (0.1.1 shipped still reporting `0.1.0`). Since this version string is baked into index metadata via `backend.py` and `storage/writer.py`, stale values previously ended up on disk. `__version__` is now derived from `importlib.metadata.version("fmql-semantic")`.
+
 ## [0.1.1] - 2026-04-21
 
 ### Changed

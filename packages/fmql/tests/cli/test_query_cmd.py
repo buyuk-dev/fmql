@@ -81,10 +81,12 @@ def test_query_order_by_asc(tmp_path: Path):
 
 
 def test_version_cmd():
+    from importlib.metadata import version as pkg_version
+
     runner = CliRunner()
     result = runner.invoke(app, ["version"])
     assert result.exit_code == 0
-    assert result.stdout.strip() == "0.2.1"
+    assert result.stdout.strip() == pkg_version("fmql")
 
 
 # ---- follow ----
