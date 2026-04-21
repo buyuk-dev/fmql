@@ -12,20 +12,13 @@ from fmql.cypher import compile_cypher_ast, parse_cypher
 from fmql.diagnostics import emit_resolver_mismatch_hints
 from fmql.errors import FmqlError
 from fmql.resolvers import resolver_by_name
+from fmql.serialization import json_default
 from fmql.workspace import Workspace
 
 
 class CypherFormat(str, Enum):
     rows = "rows"
     json = "json"
-
-
-def _json_default(o):
-    if isinstance(o, datetime):
-        return o.isoformat()
-    if isinstance(o, date):
-        return o.isoformat()
-    raise TypeError(f"not JSON-serializable: {type(o).__name__}")
 
 
 def _format_cell(v):
@@ -72,7 +65,7 @@ def cypher_cmd(
             cols = list(result.columns)
             for row in result.rows:
                 payload = {"columns": cols, "row": list(row)}
-                typer.echo(json.dumps(payload, default=_json_default, ensure_ascii=False))
+                typer.echo(json.dumps(payload, default=json_default, ensure_ascii=False))
 
     if not result.is_scalar and not result.rows:
         emit_resolver_mismatch_hints(ws, (rel.field for rel in ast.pattern.rels))

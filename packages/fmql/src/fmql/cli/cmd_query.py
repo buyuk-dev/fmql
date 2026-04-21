@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from datetime import date, datetime
 from enum import Enum
 from pathlib import Path
 from typing import Optional, Union
@@ -12,6 +11,7 @@ from fmql.diagnostics import emit_resolver_mismatch_hints
 from fmql.errors import FmqlError
 from fmql.qlang import compile_query
 from fmql.resolvers import resolver_by_name
+from fmql.serialization import json_default
 from fmql.workspace import Workspace
 
 
@@ -23,14 +23,6 @@ class OutputFormat(str, Enum):
 class Direction(str, Enum):
     forward = "forward"
     reverse = "reverse"
-
-
-def _json_default(o):
-    if isinstance(o, datetime):
-        return o.isoformat()
-    if isinstance(o, date):
-        return o.isoformat()
-    raise TypeError(f"not JSON-serializable: {type(o).__name__}")
 
 
 def _parse_depth(depth: str) -> Union[int, str]:
@@ -97,7 +89,7 @@ def query_cmd(
     else:
         for packet in packets:
             payload = {"id": packet.id, "frontmatter": packet.as_plain()}
-            typer.echo(json.dumps(payload, default=_json_default, ensure_ascii=False))
+            typer.echo(json.dumps(payload, default=json_default, ensure_ascii=False))
 
     if follow is not None and not packets and seeds_q.ids():
         r = resolver_by_name(resolver) if resolver else None

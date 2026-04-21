@@ -173,3 +173,96 @@ def test_subgraph_invalid_depth_exits_2(tmp_path: Path):
         ],
     )
     assert result.exit_code == 2
+
+
+def test_subgraph_format_cytoscape(tmp_path: Path):
+    _write_blocked_ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "subgraph",
+            str(tmp_path),
+            'uuid = "c"',
+            "--follow",
+            "blocked_by",
+            "--resolver",
+            "uuid",
+            "--format",
+            "cytoscape",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.stdout.strip())
+    assert set(payload.keys()) == {"elements"}
+    assert set(payload["elements"].keys()) == {"nodes", "edges"}
+    node_ids = sorted(n["data"]["id"] for n in payload["elements"]["nodes"])
+    assert node_ids == ["a.md", "b.md", "c.md"]
+    edge_ids = {e["data"]["id"] for e in payload["elements"]["edges"]}
+    assert "c.md__blocked_by__b.md" in edge_ids
+    assert "b.md__blocked_by__a.md" in edge_ids
+    for n in payload["elements"]["nodes"]:
+        assert "frontmatter" in n["data"]
+
+
+def test_subgraph_format_cytoscape_ids_only(tmp_path: Path):
+    _write_blocked_ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "subgraph",
+            str(tmp_path),
+            'uuid = "c"',
+            "--follow",
+            "blocked_by",
+            "--resolver",
+            "uuid",
+            "--format",
+            "cytoscape",
+            "--ids-only",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.stdout.strip())
+    for n in payload["elements"]["nodes"]:
+        assert set(n["data"].keys()) == {"id"}
+
+
+def test_subgraph_format_raw_matches_default(tmp_path: Path):
+    _write_blocked_ws(tmp_path)
+    runner = CliRunner()
+    args = [
+        "subgraph",
+        str(tmp_path),
+        'uuid = "c"',
+        "--follow",
+        "blocked_by",
+        "--resolver",
+        "uuid",
+    ]
+    default_result = runner.invoke(app, args)
+    raw_result = runner.invoke(app, [*args, "--format", "raw"])
+    assert default_result.exit_code == 0
+    assert raw_result.exit_code == 0
+    assert json.loads(default_result.stdout) == json.loads(raw_result.stdout)
+
+
+def test_subgraph_format_unknown_exits_2(tmp_path: Path):
+    _write_blocked_ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "subgraph",
+            str(tmp_path),
+            'uuid = "c"',
+            "--follow",
+            "blocked_by",
+            "--resolver",
+            "uuid",
+            "--format",
+            "graphviz",
+        ],
+    )
+    assert result.exit_code == 2

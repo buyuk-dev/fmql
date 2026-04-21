@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from fmql.filters import type_name
+from fmql.serialization import json_default
 from fmql.workspace import Workspace
 
 
@@ -134,16 +135,6 @@ def format_text(stats: WorkspaceStats) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _json_default(o: Any) -> Any:
-    if isinstance(o, datetime):
-        return o.isoformat()
-    if isinstance(o, date):
-        return o.isoformat()
-    if isinstance(o, Path):
-        return str(o)
-    raise TypeError(f"not JSON-serializable: {type(o).__name__}")
-
-
 def format_json(stats: WorkspaceStats) -> str:
     payload = {
         "root": str(stats.root),
@@ -164,4 +155,4 @@ def format_json(stats: WorkspaceStats) -> str:
             for s in stats.fields
         ],
     }
-    return json.dumps(payload, default=_json_default, ensure_ascii=False, indent=2)
+    return json.dumps(payload, default=json_default, ensure_ascii=False, indent=2)

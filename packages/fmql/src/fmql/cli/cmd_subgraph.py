@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from datetime import date, datetime
 from enum import Enum
 from pathlib import Path
 from typing import List, Optional, Union
@@ -12,21 +11,15 @@ from fmql.diagnostics import emit_resolver_mismatch_hints
 from fmql.errors import FmqlError
 from fmql.qlang import compile_query
 from fmql.resolvers import resolver_by_name
+from fmql.serialization import json_default
 from fmql.subgraph import collect_subgraph
+from fmql.subgraph_formats import SubgraphFormat, format_subgraph
 from fmql.workspace import Workspace
 
 
 class Direction(str, Enum):
     forward = "forward"
     reverse = "reverse"
-
-
-def _json_default(o):
-    if isinstance(o, datetime):
-        return o.isoformat()
-    if isinstance(o, date):
-        return o.isoformat()
-    raise TypeError(f"not JSON-serializable: {type(o).__name__}")
 
 
 def _parse_depth(depth: str) -> Union[int, str]:
@@ -66,6 +59,11 @@ def subgraph_cmd(
     ids_only: bool = typer.Option(
         False, "--ids-only", help="Emit nodes as ids only (omit frontmatter)."
     ),
+    fmt: SubgraphFormat = typer.Option(
+        SubgraphFormat.raw,
+        "--format",
+        help="Output format: raw (default) | cytoscape.",
+    ),
 ) -> None:
     try:
         ws = Workspace(path)
@@ -93,13 +91,8 @@ def subgraph_cmd(
             packet = ws.packets.get(pid)
             nodes_payload.append({"id": pid, "frontmatter": packet.as_plain() if packet else {}})
     edges_payload = [{"source": e.source, "target": e.target, "field": e.field} for e in sg.edges]
-    typer.echo(
-        json.dumps(
-            {"nodes": nodes_payload, "edges": edges_payload},
-            default=_json_default,
-            ensure_ascii=False,
-        )
-    )
+    output = format_subgraph({"nodes": nodes_payload, "edges": edges_payload}, fmt)
+    typer.echo(json.dumps(output, default=json_default, ensure_ascii=False))
 
     if not sg.edges and seeds:
         emit_resolver_mismatch_hints(ws, fields, resolver=r)

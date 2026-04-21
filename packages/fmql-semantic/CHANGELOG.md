@@ -2,11 +2,15 @@
 
 All notable changes to this package will be documented in this file.
 
-## Unreleased
+## [0.1.1] - 2026-04-21
 
 ### Changed
 
 - `--option env=PATH` now publishes every key from the dotenv file to `os.environ` (via `setdefault`) so LiteLLM provider credentials (`OPENAI_API_KEY`, `AZURE_API_*`, …) are picked up. `FMQL_*` keys still drive the typed config; existing shell env vars are never overridden.
+
+### Fixed
+
+- Suppress a benign `RuntimeWarning: coroutine '…' was never awaited` emitted at interpreter shutdown by LiteLLM's `LoggingWorker`. A narrow `warnings.filterwarnings` entry (matched by message, category, and originating module) silences the noise without masking unrelated warnings.
 
 ## [0.1.0] - 2026-04-17
 
