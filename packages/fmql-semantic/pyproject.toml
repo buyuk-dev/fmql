@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fmql-semantic"
-version = "0.1.0"
+version = "0.1.1"
 description = "Semantic (hybrid dense + sparse) search backend plugin for fmql."
 readme = "README.md"
 license = { text = "MIT" }

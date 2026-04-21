@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.2] - 2026-04-21
+
+### Added
+
+- `fmql subgraph WORKSPACE SEED_QUERY --follow FIELD [...]` command: returns the reachability closure around seed packets as `{nodes, edges}` JSON. Supports `--depth N|'*'` (default: full closure), `--direction {forward,reverse}`, `--resolver {path,uuid,slug}`, `--include-origin/--no-include-origin`, and `--ids-only`.
+- `fmql subgraph --format {raw,cytoscape}` flag. `raw` (default) preserves the `{nodes, edges}` shape; `cytoscape` emits `{elements: {nodes, edges}}` with Cytoscape.js-compatible `data` wrappers and synthesized edge IDs (`source__field__target`), ready for `cy.add()` / `cytoscape({elements: …})`.
+- Resolver-mismatch diagnostic: when traversal (on `query`, `cypher`, or `subgraph`) returns zero edges from seeds that do have reference fields, a hint is emitted to stderr pointing at likely resolver misconfiguration (e.g. UUID-style refs with the default `path` resolver).
+
 ## [0.2.1]
 
 ### Added

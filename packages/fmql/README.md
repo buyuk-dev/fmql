@@ -93,6 +93,7 @@ Official plugins live alongside core in the [fmql monorepo](https://github.com/b
 | `toggle` | Toggle boolean fields | `fmql toggle ./tasks/task-42.md flagged` |
 | `describe` | Workspace introspection | `fmql describe ./project` |
 | `cypher` | Graph pattern query (Cypher subset) | `fmql cypher ./project 'MATCH (a)-[:blocked_by]->(b) RETURN a, b'` |
+| `subgraph` | Reachability closure around seed packets as `{nodes, edges}` JSON | `fmql subgraph ./project 'uuid = "task-1"' --follow blocked_by` |
 | `search` | Run a search backend against a workspace/index | `fmql search 'alice' --workspace ./project` |
 | `index` | Build an index for an indexed backend | `fmql index ./project --backend semantic --out ./project/.fmql/semantic` |
 | `list-backends` | Enumerate discovered search backends | `fmql list-backends` |
@@ -100,8 +101,9 @@ Official plugins live alongside core in the [fmql monorepo](https://github.com/b
 Common flags:
 
 - `--format {paths,json,rows}` — output format (default: `paths` for `query`, `rows` for `cypher`).
-- `--follow FIELD`, `--depth N|'*'`, `--direction {forward,reverse}` — traversal on `query`.
-- `--resolver {path,uuid,slug}` — reference resolution strategy for traversal/Cypher.
+- `--follow FIELD`, `--depth N|'*'`, `--direction {forward,reverse}` — traversal on `query` and `subgraph`.
+- `--resolver {path,uuid,slug}` — reference resolution strategy for traversal/Cypher/subgraph.
+- `--format {raw,cytoscape}` — output shape for `subgraph` (default `raw`).
 - `--search QUERY`, `--index NAME`, `--index-location LOCATION` — pluggable search stage (backend default: `grep`).
 - `--dry-run`, `--yes` — preview or auto-confirm for edit commands.
 - `--workspace ROOT` — explicit workspace root when piping paths into edit commands.
@@ -248,6 +250,17 @@ References in frontmatter fields are resolved by the selected resolver:
 - `slug` — matches a `slug` frontmatter field on other packets.
 
 Pass `--resolver uuid` / `--resolver slug` to switch. Unresolvable references are dropped silently.
+
+For the whole reachability closure as structured graph data (not a row set), use `fmql subgraph`. It emits `{nodes, edges}` JSON by default (`--format raw`), or a Cytoscape.js-ready shape with `--format cytoscape`:
+
+```bash
+# Default: {nodes, edges} for jq / custom pipelines
+fmql subgraph ./project 'status = "active"' --follow blocked_by
+
+# Cytoscape.js: {elements: {nodes, edges}} with data wrappers + synthesized edge IDs,
+# ready for cy.add(…) or cytoscape({elements: …})
+fmql subgraph ./project 'status = "active"' --follow blocked_by --format cytoscape > graph.json
+```
 
 ## Aggregation & describe
 
