@@ -7,7 +7,7 @@ from typing import Optional, Union
 
 import typer
 
-from fmql.diagnostics import emit_resolver_mismatch_hints
+from fmql.diagnostics import maybe_emit_warnings
 from fmql.errors import FmqlError
 from fmql.qlang import compile_query
 from fmql.resolvers import resolver_by_name
@@ -47,7 +47,7 @@ def query_cmd(
     depth: str = typer.Option("1", "--depth", help="Hops to traverse: integer or '*' (or 'all')."),
     direction: Direction = typer.Option(Direction.forward, "--direction", help="forward | reverse"),
     resolver: Optional[str] = typer.Option(
-        None, "--resolver", help="path | uuid | slug (default: path)."
+        None, "--resolver", help="path | uuid | slug | id (default: path)."
     ),
     include_origin: bool = typer.Option(
         False, "--include-origin", help="Include origin packets in output."
@@ -61,13 +61,19 @@ def query_cmd(
         "--index-location",
         help="Location string for indexed backends (path / URI). Ignored by scan backends.",
     ),
+    diagnose: bool = typer.Option(
+        False,
+        "--diagnose",
+        help="Emit stderr warnings for unresolved reference values "
+        "(extra workspace scan per follow-field; default: off).",
+    ),
 ) -> None:
+    r = None
     try:
         ws = Workspace(path)
         q = compile_query(query, ws)
         if search is not None:
             q = q.search(search, index=index, location=index_location)
-        seeds_q = q
         if follow is not None:
             d = _parse_depth(depth)
             r = resolver_by_name(resolver) if resolver else None
@@ -91,6 +97,5 @@ def query_cmd(
             payload = {"id": packet.id, "frontmatter": packet.as_plain()}
             typer.echo(json.dumps(payload, default=json_default, ensure_ascii=False))
 
-    if follow is not None and not packets and seeds_q.ids():
-        r = resolver_by_name(resolver) if resolver else None
-        emit_resolver_mismatch_hints(ws, [follow], resolver=r)
+    if follow is not None:
+        maybe_emit_warnings(ws, [follow], diagnose=diagnose, resolver=r)

@@ -9,7 +9,7 @@ from typing import Optional
 import typer
 
 from fmql.cypher import compile_cypher_ast, parse_cypher
-from fmql.diagnostics import emit_resolver_mismatch_hints
+from fmql.diagnostics import maybe_emit_warnings
 from fmql.errors import FmqlError
 from fmql.resolvers import resolver_by_name
 from fmql.serialization import json_default
@@ -40,7 +40,13 @@ def cypher_cmd(
     resolver: Optional[str] = typer.Option(
         None,
         "--resolver",
-        help="Default resolver applied to every relationship: path | uuid | slug.",
+        help="Default resolver applied to every relationship: path | uuid | slug | id.",
+    ),
+    diagnose: bool = typer.Option(
+        False,
+        "--diagnose",
+        help="Emit stderr warnings for unresolved reference values "
+        "(extra workspace scan per relationship field; default: off).",
     ),
 ) -> None:
     try:
@@ -67,5 +73,5 @@ def cypher_cmd(
                 payload = {"columns": cols, "row": list(row)}
                 typer.echo(json.dumps(payload, default=json_default, ensure_ascii=False))
 
-    if not result.is_scalar and not result.rows:
-        emit_resolver_mismatch_hints(ws, (rel.field for rel in ast.pattern.rels))
+    if ast.pattern.rels:
+        maybe_emit_warnings(ws, (rel.field for rel in ast.pattern.rels), diagnose=diagnose)

@@ -4,6 +4,7 @@ import pytest
 
 from fmql.errors import FmqlError
 from fmql.resolvers import (
+    IdResolver,
     RelativePathResolver,
     SlugResolver,
     UuidResolver,
@@ -112,8 +113,60 @@ def test_resolver_by_name_known():
     assert isinstance(resolver_by_name("path"), RelativePathResolver)
     assert isinstance(resolver_by_name("uuid"), UuidResolver)
     assert isinstance(resolver_by_name("slug"), SlugResolver)
+    assert isinstance(resolver_by_name("id"), IdResolver)
 
 
 def test_resolver_by_name_unknown():
     with pytest.raises(FmqlError):
         resolver_by_name("bogus")
+
+
+def test_id_resolver_int_value(make_workspace):
+    ws = make_workspace(
+        {
+            "a.md": {"frontmatter": {"id": 1}, "body": ""},
+            "b.md": {"frontmatter": {"id": 17}, "body": ""},
+        }
+    )
+    r = IdResolver()
+    assert r.resolve(1, origin="b.md", workspace=ws) == "a.md"
+    assert r.resolve(17, origin="a.md", workspace=ws) == "b.md"
+
+
+def test_id_resolver_str_matches_int_id(make_workspace):
+    ws = make_workspace({"a.md": {"frontmatter": {"id": 17}, "body": ""}})
+    r = IdResolver()
+    assert r.resolve("17", origin="a.md", workspace=ws) == "a.md"
+
+
+def test_id_resolver_int_matches_str_id(make_workspace):
+    ws = make_workspace({"a.md": {"frontmatter": {"id": "17"}, "body": ""}})
+    r = IdResolver()
+    assert r.resolve(17, origin="a.md", workspace=ws) == "a.md"
+
+
+def test_id_resolver_string_with_leading_zero_only_matches_quoted(make_workspace):
+    ws = make_workspace(
+        {
+            "a.md": {"frontmatter": {"id": "017"}, "body": ""},
+            "b.md": {"frontmatter": {"id": 17}, "body": ""},
+        }
+    )
+    r = IdResolver()
+    assert r.resolve("017", origin="b.md", workspace=ws) == "a.md"
+    assert r.resolve(17, origin="a.md", workspace=ws) == "b.md"
+
+
+def test_id_resolver_rejects_collections_and_bool(make_workspace):
+    ws = make_workspace({"a.md": {"frontmatter": {"id": 1}, "body": ""}})
+    r = IdResolver()
+    assert r.resolve(None, origin="a.md", workspace=ws) is None
+    assert r.resolve(True, origin="a.md", workspace=ws) is None
+    assert r.resolve([1], origin="a.md", workspace=ws) is None
+    assert r.resolve({"id": 1}, origin="a.md", workspace=ws) is None
+
+
+def test_id_resolver_custom_field(make_workspace):
+    ws = make_workspace({"a.md": {"frontmatter": {"ticket_id": 42}, "body": ""}})
+    r = IdResolver(field="ticket_id")
+    assert r.resolve(42, origin="a.md", workspace=ws) == "a.md"

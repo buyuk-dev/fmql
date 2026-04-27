@@ -135,7 +135,29 @@ def test_subgraph_no_include_origin(tmp_path: Path):
     assert ids == ["a.md", "b.md"]
 
 
-def test_subgraph_resolver_mismatch_emits_hint(tmp_path: Path):
+def test_subgraph_resolver_mismatch_emits_warning(tmp_path: Path):
+    _write_blocked_ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "subgraph",
+            str(tmp_path),
+            'uuid = "c"',
+            "--follow",
+            "blocked_by",
+            "--diagnose",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.stdout.strip())
+    assert payload["edges"] == []
+    assert "warning:" in result.stderr
+    assert "blocked_by" in result.stderr
+
+
+def test_subgraph_no_diagnose_flag_is_silent(tmp_path: Path):
+    """Default invocation (no --diagnose) must never emit warnings, even on misbinds."""
     _write_blocked_ws(tmp_path)
     runner = CliRunner()
     result = runner.invoke(
@@ -149,10 +171,50 @@ def test_subgraph_resolver_mismatch_emits_hint(tmp_path: Path):
         ],
     )
     assert result.exit_code == 0, result.output
+    assert "warning:" not in result.stderr
+
+
+def test_subgraph_diagnose_via_workspace_md(tmp_path: Path):
+    _write_blocked_ws(tmp_path)
+    (tmp_path / "WORKSPACE.md").write_text("---\nfmql:\n  diagnose: true\n---\n", encoding="utf-8")
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "subgraph",
+            str(tmp_path),
+            'uuid = "c"',
+            "--follow",
+            "blocked_by",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "warning:" in result.stderr
+
+
+def test_subgraph_warning_fires_on_partial_mismatch_with_nonempty_edges(tmp_path: Path):
+    root = tmp_path
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "a.md").write_text("---\nuuid: a\n---\n", encoding="utf-8")
+    (root / "b.md").write_text("---\nuuid: b\nblocked_by: [a, ghost]\n---\n", encoding="utf-8")
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "subgraph",
+            str(tmp_path),
+            'uuid = "b"',
+            "--follow",
+            "blocked_by",
+            "--resolver",
+            "uuid",
+            "--diagnose",
+        ],
+    )
+    assert result.exit_code == 0, result.output
     payload = json.loads(result.stdout.strip())
-    assert payload["edges"] == []
-    assert "hint:" in result.stderr
-    assert "blocked_by" in result.stderr
+    assert len(payload["edges"]) == 1
+    assert "warning:" in result.stderr
 
 
 def test_subgraph_invalid_depth_exits_2(tmp_path: Path):

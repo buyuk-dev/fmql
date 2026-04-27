@@ -4,9 +4,15 @@ import warnings
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
+from fmql.config import (
+    build_resolvers_from_config,
+    load_workspace_config,
+    read_diagnose_flag,
+)
 from fmql.errors import ParseError
 from fmql.packet import Packet
 from fmql.parser import parse_file
+from fmql.resolvers import RelativePathResolver
 from fmql.types import PacketId, Resolver
 
 
@@ -24,12 +30,14 @@ class Workspace:
             raise FileNotFoundError(f"workspace root does not exist: {self.root}")
         self.glob: tuple[str, ...] = tuple(glob)
         self.packets: dict[PacketId, Packet] = {}
-        self.resolvers: dict[str, Resolver] = dict(resolvers or {})
-        if default_resolver is None:
-            from fmql.resolvers import RelativePathResolver
 
-            default_resolver = RelativePathResolver()
+        file_cfg = load_workspace_config(self.root)
+        file_resolvers, file_default = build_resolvers_from_config(file_cfg)
+        self.resolvers: dict[str, Resolver] = {**file_resolvers, **(resolvers or {})}
+        if default_resolver is None:
+            default_resolver = file_default or RelativePathResolver()
         self.default_resolver: Resolver = default_resolver
+        self.diagnose_default: bool = read_diagnose_flag(file_cfg)
         self._field_index: dict[str, dict[Any, list[PacketId]]] = {}
         self._stem_index: Optional[dict[str, list[PacketId]]] = None
         self._reverse_cache: dict[tuple[str, int], dict[PacketId, list[PacketId]]] = {}

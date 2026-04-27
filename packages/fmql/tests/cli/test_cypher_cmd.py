@@ -139,7 +139,7 @@ def test_cypher_reverse_edge_exits_2(tmp_path: Path):
     assert result.exit_code == 2
 
 
-def test_cypher_zero_rows_emits_resolver_mismatch_hint(tmp_path: Path):
+def test_cypher_zero_rows_emits_resolver_warning(tmp_path: Path):
     _write_uuid_refs(tmp_path)
     runner = CliRunner()
     result = runner.invoke(
@@ -148,16 +148,16 @@ def test_cypher_zero_rows_emits_resolver_mismatch_hint(tmp_path: Path):
             "cypher",
             str(tmp_path),
             "MATCH (a)-[:blocked_by]->(b) RETURN a, b",
+            "--diagnose",
         ],
     )
     assert result.exit_code == 0, result.output
     assert result.stdout == ""
-    assert "hint:" in result.stderr
+    assert "warning:" in result.stderr
     assert "blocked_by" in result.stderr
-    assert "resolver mismatch" in result.stderr
 
 
-def test_cypher_zero_rows_hint_suppressed_with_matching_resolver(tmp_path: Path):
+def test_cypher_warning_suppressed_with_matching_resolver(tmp_path: Path):
     _write_uuid_refs(tmp_path)
     runner = CliRunner()
     result = runner.invoke(
@@ -168,7 +168,40 @@ def test_cypher_zero_rows_hint_suppressed_with_matching_resolver(tmp_path: Path)
             "MATCH (a)-[:blocked_by]->(b) RETURN a, b",
             "--resolver",
             "uuid",
+            "--diagnose",
         ],
     )
     assert result.exit_code == 0, result.output
-    assert "hint:" not in result.stderr
+    assert "warning:" not in result.stderr
+
+
+def test_cypher_no_diagnose_flag_is_silent(tmp_path: Path):
+    """Default invocation (no --diagnose) must never emit warnings."""
+    _write_uuid_refs(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "cypher",
+            str(tmp_path),
+            "MATCH (a)-[:blocked_by]->(b) RETURN a, b",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "warning:" not in result.stderr
+
+
+def test_cypher_diagnose_via_workspace_md(tmp_path: Path):
+    _write_uuid_refs(tmp_path)
+    (tmp_path / "WORKSPACE.md").write_text("---\nfmql:\n  diagnose: true\n---\n", encoding="utf-8")
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "cypher",
+            str(tmp_path),
+            "MATCH (a)-[:blocked_by]->(b) RETURN a, b",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "warning:" in result.stderr

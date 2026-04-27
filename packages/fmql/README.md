@@ -102,9 +102,10 @@ Common flags:
 
 - `--format {paths,json,rows}` — output format (default: `paths` for `query`, `rows` for `cypher`).
 - `--follow FIELD`, `--depth N|'*'`, `--direction {forward,reverse}` — traversal on `query` and `subgraph`.
-- `--resolver {path,uuid,slug}` — reference resolution strategy for traversal/Cypher/subgraph.
+- `--resolver {path,uuid,slug,id}` — reference resolution strategy for traversal/Cypher/subgraph.
 - `--format {raw,cytoscape}` — output shape for `subgraph` (default `raw`).
 - `--search QUERY`, `--index NAME`, `--index-location LOCATION` — pluggable search stage (backend default: `grep`).
+- `--diagnose` — on `query`, `subgraph`, and `cypher`: emit stderr `warning:` lines for reference values the active resolver could not match. Off by default; costs one extra workspace scan per follow-field. Enable globally for a workspace via `fmql.diagnose: true` in `WORKSPACE.md`.
 - `--dry-run`, `--yes` — preview or auto-confirm for edit commands.
 - `--workspace ROOT` — explicit workspace root when piping paths into edit commands.
 
@@ -246,10 +247,37 @@ fmql query ./project 'uuid = "task-42"' --follow blocked_by --direction reverse
 References in frontmatter fields are resolved by the selected resolver:
 
 - `path` (default) — relative filesystem paths, e.g. `blocked_by: ../tasks/task-41.md`.
-- `uuid` — matches a `uuid` frontmatter field on other packets.
-- `slug` — matches a `slug` frontmatter field on other packets.
+- `uuid` — matches a `uuid` frontmatter field on other packets (string values only).
+- `slug` — matches a `slug` frontmatter field on other packets, falling back to file stem.
+- `id` — matches an `id` frontmatter field; accepts both int and string values, so `depends_on: [1, 8, 17]` resolves out of the box on roadmap/ADR/ticket corpora where YAML coerces unquoted IDs to ints.
 
-Pass `--resolver uuid` / `--resolver slug` to switch. Unresolvable references are dropped silently.
+Pass `--resolver uuid` / `--resolver slug` / `--resolver id` to switch the default for one invocation.
+
+Resolver bindings can fall through silently — e.g. binding `uuid` to a field whose values are integers will produce empty edges with no error. Pass `--diagnose` (off by default for performance) to scan the workspace and emit a `warning:` line to stderr for each field with unresolved values, including sample values and a copy-pasteable `WORKSPACE.md` snippet that fixes the binding. Set `fmql.diagnose: true` in `WORKSPACE.md` to enable diagnostics by default for a given workspace.
+
+> Quote IDs with leading zeros (`id: "017"`) — YAML 1.2 parses unquoted `017` as the integer 17, and the `id` resolver does not bridge that gap. Quoted strings only match quoted strings; unquoted ints only match unquoted ints (with a string fallback for cross-coercion).
+
+### Workspace configuration (`WORKSPACE.md`)
+
+Drop a `WORKSPACE.md` file at the workspace root with an `fmql:` block in its frontmatter to bind resolvers per field — eliminating the need for `--resolver` on every command:
+
+```markdown
+---
+fmql:
+  default_resolver: path
+  resolvers:
+    depends_on: id
+    supersedes: slug
+    blocked_by: uuid
+  diagnose: true       # optional; enables --diagnose by default for this workspace
+---
+
+# My Workspace
+
+Free-form notes here. The body is ignored by fmql; only the `fmql:` block in frontmatter is configuration.
+```
+
+Precedence: `--resolver FLAG` (per-invocation) > Python `Workspace(resolvers=…, default_resolver=…)` kwargs > `WORKSPACE.md` > built-in `path` default. An unknown resolver name in `WORKSPACE.md` raises an error at workspace load time. `fmql.diagnose` must be a boolean — non-bool values raise an error.
 
 For the whole reachability closure as structured graph data (not a row set), use `fmql subgraph`. It emits `{nodes, edges}` JSON by default (`--format raw`), or a Cytoscape.js-ready shape with `--format cytoscape`:
 

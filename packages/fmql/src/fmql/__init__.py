@@ -10,7 +10,13 @@ from fmql.edits import ApplyReport, EditOp, EditPlan
 from fmql.errors import CypherError, CypherUnsupported, EditError
 from fmql.packet import Packet
 from fmql.query import Query
-from fmql.resolvers import RelativePathResolver, SlugResolver, UuidResolver, resolver_by_name
+from fmql.resolvers import (
+    IdResolver,
+    RelativePathResolver,
+    SlugResolver,
+    UuidResolver,
+    resolver_by_name,
+)
 from fmql.workspace import Workspace
 
 __version__ = _pkg_version("fmql")
@@ -27,6 +33,7 @@ __all__ = [
     "EditPlan",
     "FieldStat",
     "GroupedQuery",
+    "IdResolver",
     "Max",
     "Min",
     "Packet",

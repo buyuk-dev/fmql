@@ -189,7 +189,7 @@ def test_query_follow_include_origin(tmp_path: Path):
     assert lines == ["a.md", "b.md", "c.md"]
 
 
-def test_query_follow_zero_results_emits_resolver_mismatch_hint(tmp_path: Path):
+def test_query_follow_zero_results_emits_resolver_warning(tmp_path: Path):
     _write_blocked_ws(tmp_path)
     runner = CliRunner()
     result = runner.invoke(
@@ -200,16 +200,16 @@ def test_query_follow_zero_results_emits_resolver_mismatch_hint(tmp_path: Path):
             'uuid = "c"',
             "--follow",
             "blocked_by",
+            "--diagnose",
         ],
     )
     assert result.exit_code == 0, result.output
     assert result.stdout.strip() == ""
-    assert "hint:" in result.stderr
+    assert "warning:" in result.stderr
     assert "blocked_by" in result.stderr
-    assert "resolver mismatch" in result.stderr
 
 
-def test_query_follow_zero_results_hint_suppressed_with_matching_resolver(tmp_path: Path):
+def test_query_follow_warning_suppressed_with_matching_resolver(tmp_path: Path):
     _write_blocked_ws(tmp_path)
     runner = CliRunner()
     result = runner.invoke(
@@ -222,13 +222,14 @@ def test_query_follow_zero_results_hint_suppressed_with_matching_resolver(tmp_pa
             "blocked_by",
             "--resolver",
             "uuid",
+            "--diagnose",
         ],
     )
     assert result.exit_code == 0, result.output
-    assert "hint:" not in result.stderr
+    assert "warning:" not in result.stderr
 
 
-def test_query_follow_empty_seeds_no_hint(tmp_path: Path):
+def test_query_follow_warning_fires_even_with_empty_seeds(tmp_path: Path):
     _write_blocked_ws(tmp_path)
     runner = CliRunner()
     result = runner.invoke(
@@ -239,22 +240,143 @@ def test_query_follow_empty_seeds_no_hint(tmp_path: Path):
             'uuid = "no-such-packet"',
             "--follow",
             "blocked_by",
+            "--diagnose",
         ],
     )
     assert result.exit_code == 0, result.output
     assert result.stdout.strip() == ""
-    assert "hint:" not in result.stderr
+    # Warning reflects workspace state — bound resolver leaves blocked_by
+    # values unresolved across the workspace, regardless of seed selection.
+    assert "warning:" in result.stderr
 
 
-def test_query_without_follow_no_hint_on_zero_results(tmp_path: Path):
+def test_query_without_follow_no_warning(tmp_path: Path):
     _write_blocked_ws(tmp_path)
     runner = CliRunner()
     result = runner.invoke(
         app,
-        ["query", str(tmp_path), 'uuid = "nope"'],
+        ["query", str(tmp_path), 'uuid = "nope"', "--diagnose"],
     )
     assert result.exit_code == 0, result.output
-    assert "hint:" not in result.stderr
+    assert "warning:" not in result.stderr
+
+
+def test_query_follow_no_diagnose_flag_is_silent(tmp_path: Path):
+    """Default invocation (no --diagnose) must never emit warnings, even on misbinds."""
+    _write_blocked_ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "query",
+            str(tmp_path),
+            'uuid = "c"',
+            "--follow",
+            "blocked_by",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "warning:" not in result.stderr
+
+
+def test_query_diagnose_invalid_workspace_md_value_exits_2(tmp_path: Path):
+    _write_blocked_ws(tmp_path)
+    (tmp_path / "WORKSPACE.md").write_text('---\nfmql:\n  diagnose: "yes"\n---\n', encoding="utf-8")
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["query", str(tmp_path), 'uuid = "c"', "--follow", "blocked_by"],
+    )
+    assert result.exit_code == 2
+    assert "diagnose" in result.stderr
+
+
+def test_query_follow_diagnose_via_workspace_md(tmp_path: Path):
+    _write_blocked_ws(tmp_path)
+    (tmp_path / "WORKSPACE.md").write_text("---\nfmql:\n  diagnose: true\n---\n", encoding="utf-8")
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "query",
+            str(tmp_path),
+            'uuid = "c"',
+            "--follow",
+            "blocked_by",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "warning:" in result.stderr
+
+
+def test_query_follow_partial_mismatch_emits_warning(tmp_path: Path):
+    """A field where some values resolve and some don't should still warn."""
+    root = tmp_path
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "a.md").write_text("---\nuuid: a\n---\n", encoding="utf-8")
+    (root / "b.md").write_text("---\nuuid: b\nblocked_by: [a, ghost]\n---\n", encoding="utf-8")
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "query",
+            str(tmp_path),
+            'uuid = "b"',
+            "--follow",
+            "blocked_by",
+            "--resolver",
+            "uuid",
+            "--diagnose",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "warning:" in result.stderr
+    assert "blocked_by" in result.stderr
+
+
+def test_query_workspace_md_id_resolver_end_to_end(tmp_path: Path):
+    root = tmp_path
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "WORKSPACE.md").write_text(
+        "---\nfmql:\n  resolvers:\n    depends_on: id\n---\n", encoding="utf-8"
+    )
+    (root / "a.md").write_text("---\nid: 1\n---\n", encoding="utf-8")
+    (root / "b.md").write_text("---\nid: 2\ndepends_on: [1]\n---\n", encoding="utf-8")
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["query", str(tmp_path), "id = 2", "--follow", "depends_on", "--diagnose"],
+    )
+    assert result.exit_code == 0, result.output
+    lines = [ln for ln in result.stdout.splitlines() if ln.strip()]
+    assert lines == ["a.md"]
+    assert "warning:" not in result.stderr
+
+
+def test_query_cli_resolver_overrides_workspace_md_binding(tmp_path: Path):
+    root = tmp_path
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "WORKSPACE.md").write_text(
+        "---\nfmql:\n  resolvers:\n    depends_on: id\n---\n", encoding="utf-8"
+    )
+    (root / "a.md").write_text("---\nid: 1\nuuid: a\n---\n", encoding="utf-8")
+    (root / "b.md").write_text("---\nid: 2\nuuid: b\ndepends_on: [a]\n---\n", encoding="utf-8")
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "query",
+            str(tmp_path),
+            'uuid = "b"',
+            "--follow",
+            "depends_on",
+            "--resolver",
+            "uuid",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    lines = [ln for ln in result.stdout.splitlines() if ln.strip()]
+    assert lines == ["a.md"]
 
 
 def test_query_follow_invalid_depth(tmp_path: Path):

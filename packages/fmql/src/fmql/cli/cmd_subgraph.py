@@ -7,7 +7,7 @@ from typing import List, Optional, Union
 
 import typer
 
-from fmql.diagnostics import emit_resolver_mismatch_hints
+from fmql.diagnostics import maybe_emit_warnings
 from fmql.errors import FmqlError
 from fmql.qlang import compile_query
 from fmql.resolvers import resolver_by_name
@@ -49,7 +49,7 @@ def subgraph_cmd(
     ),
     direction: Direction = typer.Option(Direction.forward, "--direction", help="forward | reverse"),
     resolver: Optional[str] = typer.Option(
-        None, "--resolver", help="path | uuid | slug (default: per-workspace default)."
+        None, "--resolver", help="path | uuid | slug | id (default: per-workspace default)."
     ),
     include_origin: bool = typer.Option(
         True,
@@ -63,6 +63,12 @@ def subgraph_cmd(
         SubgraphFormat.raw,
         "--format",
         help="Output format: raw (default) | cytoscape.",
+    ),
+    diagnose: bool = typer.Option(
+        False,
+        "--diagnose",
+        help="Emit stderr warnings for unresolved reference values "
+        "(extra workspace scan per follow-field; default: off).",
     ),
 ) -> None:
     try:
@@ -94,5 +100,4 @@ def subgraph_cmd(
     output = format_subgraph({"nodes": nodes_payload, "edges": edges_payload}, fmt)
     typer.echo(json.dumps(output, default=json_default, ensure_ascii=False))
 
-    if not sg.edges and seeds:
-        emit_resolver_mismatch_hints(ws, fields, resolver=r)
+    maybe_emit_warnings(ws, fields, diagnose=diagnose, resolver=r)
