@@ -5,7 +5,7 @@ from typing import Optional
 
 import typer
 
-from fmql.cli._coerce import coerce_value, split_assignments
+from fmql.cli._coerce import coerce_json_value, coerce_value, split_assignments
 from fmql.cli._edit_common import cli_guard, resolve_targets_and_workspace, run_plan
 from fmql.edits import plan_append
 from fmql.errors import EditError
@@ -23,6 +23,8 @@ def append_cmd(
     if not raw_assigns:
         raise EditError("no assignments (expected field=value)")
     ws, pids = resolve_targets_and_workspace(targets, workspace_flag=workspace)
-    assignments = {k: coerce_value(v) for k, v in raw_assigns}
+    assignments = {
+        k: (coerce_json_value(v) if is_json else coerce_value(v)) for k, v, is_json in raw_assigns
+    }
     plan = plan_append(ws, pids, **assignments)
     return run_plan(plan, dry_run=dry_run, yes=yes)

@@ -22,7 +22,10 @@ def rename_cmd(
     targets, raw_assigns = split_assignments(args)
     if not raw_assigns:
         raise EditError("no mappings (expected old=new)")
+    for k, _v, is_json in raw_assigns:
+        if is_json:
+            raise EditError(f"rename does not support ':=' (got {k!r})")
     ws, pids = resolve_targets_and_workspace(targets, workspace_flag=workspace)
-    mapping = {k: v for k, v in raw_assigns}
+    mapping = {k: v for k, v, _ in raw_assigns}
     plan = plan_rename(ws, pids, **mapping)
     return run_plan(plan, dry_run=dry_run, yes=yes)

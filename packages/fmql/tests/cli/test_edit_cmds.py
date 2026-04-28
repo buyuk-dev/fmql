@@ -89,6 +89,85 @@ def test_set_requires_assignments(tmp_path: Path) -> None:
     assert result.exit_code == 2
 
 
+def _load_fm(path: Path) -> dict:
+    from ruamel.yaml import YAML
+
+    text = path.read_text(encoding="utf-8")
+    assert text.startswith("---\n")
+    end = text.index("\n---", 4)
+    return YAML(typ="safe").load(text[4:end])
+
+
+def test_set_with_json_list(tmp_path: Path) -> None:
+    root = _ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(app, ["set", str(root / "a.md"), 'depends_on:=["x","y"]', "--yes"])
+    assert result.exit_code == 0, result.output
+    fm = _load_fm(root / "a.md")
+    assert fm["depends_on"] == ["x", "y"]
+
+
+def test_set_with_json_dict(tmp_path: Path) -> None:
+    root = _ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(app, ["set", str(root / "a.md"), 'meta:={"author":"me","n":2}', "--yes"])
+    assert result.exit_code == 0, result.output
+    fm = _load_fm(root / "a.md")
+    assert fm["meta"] == {"author": "me", "n": 2}
+
+
+def test_set_with_json_scalar(tmp_path: Path) -> None:
+    root = _ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(app, ["set", str(root / "a.md"), "count:=42", "--yes"])
+    assert result.exit_code == 0, result.output
+    fm = _load_fm(root / "a.md")
+    assert fm["count"] == 42
+
+
+def test_set_rejects_bracket_string(tmp_path: Path) -> None:
+    root = _ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(app, ["set", str(root / "a.md"), "tags=[a,b]", "--yes"])
+    assert result.exit_code == 2
+    assert ":=" in result.stderr
+
+
+def test_set_rejects_brace_string(tmp_path: Path) -> None:
+    root = _ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(app, ["set", str(root / "a.md"), "meta={x:1}", "--yes"])
+    assert result.exit_code == 2
+    assert ":=" in result.stderr
+
+
+def test_set_invalid_json_errors(tmp_path: Path) -> None:
+    root = _ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(app, ["set", str(root / "a.md"), "tags:=[broken", "--yes"])
+    assert result.exit_code == 2
+    assert "JSON" in result.stderr
+
+
+def test_set_mixed_json_and_scalar(tmp_path: Path) -> None:
+    root = _ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "set",
+            str(root / "a.md"),
+            'depends_on:=["x","y"]',
+            "priority=9",
+            "--yes",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    fm = _load_fm(root / "a.md")
+    assert fm["depends_on"] == ["x", "y"]
+    assert fm["priority"] == 9
+
+
 # ---- remove ----
 
 
@@ -122,6 +201,14 @@ def test_rename_field(tmp_path: Path) -> None:
     assert "status:" not in text
 
 
+def test_rename_rejects_json_op(tmp_path: Path) -> None:
+    root = _ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(app, ["rename", str(root / "a.md"), "status:=state", "--yes"])
+    assert result.exit_code == 2
+    assert ":=" in result.stderr
+
+
 def test_rename_collision_errors(tmp_path: Path) -> None:
     root = _ws(tmp_path)
     runner = CliRunner()
@@ -150,6 +237,15 @@ def test_append_creates_list(tmp_path: Path) -> None:
     result = runner.invoke(app, ["append", str(root / "b.md"), "tags=first", "--yes"])
     assert result.exit_code == 0, result.output
     assert "  - first" in (root / "b.md").read_text()
+
+
+def test_append_with_json_list(tmp_path: Path) -> None:
+    root = _ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(app, ["append", str(root / "a.md"), 'tags:=["p","q"]', "--yes"])
+    assert result.exit_code == 0, result.output
+    fm = _load_fm(root / "a.md")
+    assert fm["tags"] == ["x", ["p", "q"]]
 
 
 def test_append_type_conflict_errors(tmp_path: Path) -> None:
