@@ -92,7 +92,8 @@ Official plugins live alongside core in the [fmql monorepo](https://github.com/b
 | `append` | Append to list-valued fields | `fmql append ./tasks/task-42.md tags=urgent` |
 | `toggle` | Toggle boolean fields | `fmql toggle ./tasks/task-42.md flagged` |
 | `describe` | Workspace introspection | `fmql describe ./project` |
-| `cypher` | Graph pattern query (Cypher subset) | `fmql cypher ./project 'MATCH (a)-[:blocked_by]->(b) RETURN a, b'` |
+| `cypher` | Graph pattern query (Cypher subset, optional `SET`) | `fmql cypher ./project 'MATCH (a)-[:blocked_by]->(b) RETURN a, b'` |
+| `update` | Pattern-match and edit packets (`MATCH ... SET`) | `fmql update ./project 'MATCH (t) SET t.depends_on = slug(t.depends_on)'` |
 | `subgraph` | Reachability closure around seed packets as `{nodes, edges}` JSON | `fmql subgraph ./project 'uuid = "task-1"' --follow blocked_by` |
 | `search` | Run a search backend against a workspace/index | `fmql search 'alice' --workspace ./project` |
 | `index` | Build an index for an indexed backend | `fmql index ./project --backend semantic --out ./project/.fmql/semantic` |
@@ -214,6 +215,7 @@ MATCH (a)-[:field*]->(b)                # transitive
 MATCH (a)-[:field*1..5]->(b)            # bounded depth
 MATCH (a)-[:blocked_by*]->(a)           # cycle detection
 WHERE a.status = "active" AND b.priority > 2
+SET a.status = "archived", a.label = b.title
 RETURN a
 RETURN a, b
 RETURN a.title
@@ -228,6 +230,40 @@ Node labels parse but are ignored (schemaless). The `WHERE` clause uses the same
 fmql cypher ./project 'MATCH (a)-[:blocked_by*]->(a) RETURN a'
 fmql cypher ./project 'MATCH (a)-[:belongs_to]->(e) WHERE e.type = "epic" RETURN a, e'
 ```
+
+#### `SET` (bulk migrations)
+
+`SET` rewrites frontmatter on matched packets. Right-hand sides accept literals, qualified field references (`var.field`), and function calls. A query may have `SET` only, `RETURN` only, or both — when both are present `SET` applies first, then `RETURN` projects against the post-write state (Neo4j ordering). Multiple bindings writing the same `(packet, field)` with different values is rejected as a `SET` conflict.
+
+Built-in functions:
+
+| Function | Purpose |
+|---|---|
+| `resolve(v)` | Resolve `v` via the workspace's default resolver (or per-field binding) → packet id. |
+| `resolve(v, "<name>")` | Resolve via a specific resolver: `path`, `uuid`, `slug`, or `id`. |
+| `field(pid, "<name>")` | Read frontmatter field `name` from packet `pid` (returns `None` if `pid` is `None` or the field is missing). |
+| `slug(v)` / `id(v)` / `uuid(v)` | Shortcut for `field(resolve(v, "<name>"), "<name>")`. |
+| `path(v)` | Shortcut for `resolve(v, "path")` — returns the relative packet id. |
+
+When the first positional argument evaluates to a list, the call is broadcast element-wise (subsequent args stay scalar); unresolvable elements become `None` and are preserved in position.
+
+Both `fmql cypher` (when `SET` is present) and `fmql update` accept `--dry-run` (preview the diff without writing) and `--yes` (skip the confirm prompt).
+
+```bash
+# Migrate id-shaped references to slugs.
+fmql update ./project 'MATCH (t) SET t.depends_on = slug(t.depends_on)'
+
+# Same migration via the cypher command.
+fmql cypher ./project 'MATCH (t) SET t.depends_on = slug(t.depends_on)' --yes
+
+# Compose: id → packet → slug field.
+fmql update ./project 'MATCH (t) SET t.depends_on = field(resolve(t.depends_on, "id"), "slug")'
+
+# SET + RETURN: write then project the updated rows.
+fmql cypher ./project 'MATCH (t) WHERE t.status = "old" SET t.status = "archived" RETURN t' --yes
+```
+
+`fmql update` is a thin wrapper that requires a `SET` clause and rejects `RETURN`/`ORDER BY` — use `fmql cypher` when you want both.
 
 ## Traversal & resolvers
 

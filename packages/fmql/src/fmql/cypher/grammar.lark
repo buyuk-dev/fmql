@@ -1,8 +1,19 @@
 ?start: cypher
 
-cypher: match_clause where_clause? return_clause order_clause?
+cypher: match_clause where_clause? set_clause? return_clause? order_clause?
 
 match_clause: MATCH_KW pattern
+
+set_clause: SET_KW set_item (COMMA set_item)*
+set_item: qualified_ident EQ value_expr
+
+?value_expr: value_atom
+           | func_call
+
+?value_atom: value
+           | qualified_ident   -> ve_ref
+
+func_call: IDENT "(" [value_expr (COMMA value_expr)*] ")"
 
 pattern: node (rel node)*
 
@@ -60,6 +71,7 @@ value: ESCAPED_STRING   -> v_string
 MATCH_KW.5: "MATCH"i
 WHERE_KW.5: "WHERE"i
 RETURN_KW.5: "RETURN"i
+SET_KW.5: "SET"i
 COUNT_KW.5: "count"i
 ORDER_KW.5: "ORDER"i
 BY_KW.5: "BY"i

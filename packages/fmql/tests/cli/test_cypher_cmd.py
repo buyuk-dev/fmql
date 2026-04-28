@@ -205,3 +205,63 @@ def test_cypher_diagnose_via_workspace_md(tmp_path: Path):
     )
     assert result.exit_code == 0, result.output
     assert "warning:" in result.stderr
+
+
+def _write_status_packets(root: Path) -> None:
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "a.md").write_text("---\nuuid: a\nstatus: old\n---\n", encoding="utf-8")
+    (root / "b.md").write_text("---\nuuid: b\nstatus: old\n---\n", encoding="utf-8")
+    (root / "c.md").write_text("---\nuuid: c\nstatus: new\n---\n", encoding="utf-8")
+
+
+def test_cypher_with_set_writes_files(tmp_path: Path):
+    _write_status_packets(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "cypher",
+            str(tmp_path),
+            'MATCH (t) WHERE t.status = "old" SET t.status = "archived"',
+            "--yes",
+        ],
+    )
+    assert result.exit_code == 0, (result.output, result.stderr)
+    assert "archived" in (tmp_path / "a.md").read_text(encoding="utf-8")
+    assert "archived" in (tmp_path / "b.md").read_text(encoding="utf-8")
+    assert "new" in (tmp_path / "c.md").read_text(encoding="utf-8")
+
+
+def test_cypher_with_set_dry_run_does_not_write(tmp_path: Path):
+    _write_status_packets(tmp_path)
+    before = (tmp_path / "a.md").read_text(encoding="utf-8")
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "cypher",
+            str(tmp_path),
+            'MATCH (t) WHERE t.status = "old" SET t.status = "archived"',
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0
+    assert (tmp_path / "a.md").read_text(encoding="utf-8") == before
+
+
+def test_cypher_set_with_return_runs_both(tmp_path: Path):
+    _write_status_packets(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "cypher",
+            str(tmp_path),
+            'MATCH (t) WHERE t.status = "old" SET t.status = "archived" RETURN t',
+            "--yes",
+        ],
+    )
+    assert result.exit_code == 0, (result.output, result.stderr)
+    pids = sorted(ln for ln in result.stdout.splitlines() if ln.strip())
+    assert pids == ["a.md", "b.md"]
+    assert "archived" in (tmp_path / "a.md").read_text(encoding="utf-8")

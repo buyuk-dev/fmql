@@ -46,11 +46,39 @@ ReturnItem = Union[ReturnVar, ReturnField, ReturnCount]
 
 
 @dataclass(frozen=True)
+class LiteralExpr:
+    value: Any
+
+
+@dataclass(frozen=True)
+class FieldRef:
+    var: str
+    field: str
+
+
+@dataclass(frozen=True)
+class CallExpr:
+    name: str
+    args: tuple["ValueExpr", ...]
+
+
+ValueExpr = Union[LiteralExpr, FieldRef, CallExpr]
+
+
+@dataclass(frozen=True)
+class SetItem:
+    var: str
+    field: str
+    expr: ValueExpr
+
+
+@dataclass(frozen=True)
 class CypherAST:
     pattern: Pattern
-    where: Optional[ExprNode]
-    returns: tuple[ReturnItem, ...]
+    where: Optional[ExprNode] = None
+    returns: tuple[ReturnItem, ...] = ()
     order_by: tuple[OrderKey, ...] = ()
+    set_items: tuple[SetItem, ...] = ()
 
 
 @dataclass(frozen=True)

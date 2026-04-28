@@ -13,6 +13,7 @@ from fmql.cli.cmd_rename import rename_cmd
 from fmql.cli.cmd_set import set_cmd
 from fmql.cli.cmd_subgraph import subgraph_cmd
 from fmql.cli.cmd_toggle import toggle_cmd
+from fmql.cli.cmd_update import update_cmd
 
 app = typer.Typer(
     name="fmql",
@@ -28,6 +29,7 @@ app.command(name="append", help="Append to list-valued fields (field=value).")(a
 app.command(name="toggle", help="Toggle boolean fields.")(toggle_cmd)
 app.command(name="describe", help="Describe a workspace of frontmatter files.")(describe_cmd)
 app.command(name="cypher", help="Run a Cypher-subset pattern query.")(cypher_cmd)
+app.command(name="update", help="Pattern-match and edit packets (MATCH ... SET).")(update_cmd)
 app.command(name="subgraph", help="Collect a reachability subgraph around seeds.")(subgraph_cmd)
 app.command(name="search", help="Search a workspace or index.")(search_cmd)
 app.command(name="index", help="Build a search index for a workspace.")(index_cmd)

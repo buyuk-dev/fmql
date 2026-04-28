@@ -8,6 +8,7 @@ from typing import Optional
 
 import typer
 
+from fmql.cli._edit_common import run_plan
 from fmql.cypher import compile_cypher_ast, parse_cypher
 from fmql.diagnostics import maybe_emit_warnings
 from fmql.errors import FmqlError
@@ -35,7 +36,7 @@ def cypher_cmd(
     path: Path = typer.Argument(
         ..., exists=True, file_okay=False, dir_okay=True, resolve_path=True
     ),
-    query: str = typer.Argument(..., help="Cypher subset query (MATCH ... [WHERE ...] RETURN ...)"),
+    query: str = typer.Argument(..., help="Cypher subset query (MATCH ... [SET ...] [RETURN ...])"),
     fmt: CypherFormat = typer.Option(CypherFormat.rows, "--format", "-f", help="Output format."),
     resolver: Optional[str] = typer.Option(
         None,
@@ -48,30 +49,41 @@ def cypher_cmd(
         help="Emit stderr warnings for unresolved reference values "
         "(extra workspace scan per relationship field; default: off).",
     ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="With SET: preview changes without writing."
+    ),
+    yes: bool = typer.Option(False, "--yes", help="With SET: skip the confirmation prompt."),
 ) -> None:
     try:
         default_r = resolver_by_name(resolver) if resolver else None
         ws = Workspace(path, default_resolver=default_r)
         ast = parse_cypher(query)
-        result = compile_cypher_ast(ast, ws)
+        execution = compile_cypher_ast(ast, ws)
     except FmqlError as e:
         typer.echo(f"error: {e}", err=True)
         raise typer.Exit(code=2)
 
-    if fmt is CypherFormat.rows:
-        if result.is_scalar:
-            typer.echo(str(result.scalar))
+    code = run_plan(execution.plan, dry_run=dry_run, yes=yes) if execution.plan is not None else 0
+
+    if execution.result is not None and code == 0:
+        result = execution.result
+        if fmt is CypherFormat.rows:
+            if result.is_scalar:
+                typer.echo(str(result.scalar))
+            else:
+                for row in result.rows:
+                    typer.echo("\t".join(_format_cell(v) for v in row))
         else:
-            for row in result.rows:
-                typer.echo("\t".join(_format_cell(v) for v in row))
-    else:
-        if result.is_scalar:
-            typer.echo(json.dumps({"count": result.scalar}))
-        else:
-            cols = list(result.columns)
-            for row in result.rows:
-                payload = {"columns": cols, "row": list(row)}
-                typer.echo(json.dumps(payload, default=json_default, ensure_ascii=False))
+            if result.is_scalar:
+                typer.echo(json.dumps({"count": result.scalar}))
+            else:
+                cols = list(result.columns)
+                for row in result.rows:
+                    payload = {"columns": cols, "row": list(row)}
+                    typer.echo(json.dumps(payload, default=json_default, ensure_ascii=False))
 
     if ast.pattern.rels:
         maybe_emit_warnings(ws, (rel.field for rel in ast.pattern.rels), diagnose=diagnose)
+
+    if code != 0:
+        raise typer.Exit(code=code)

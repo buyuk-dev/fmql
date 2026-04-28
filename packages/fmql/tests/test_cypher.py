@@ -84,7 +84,6 @@ def test_parse_keywords_are_case_insensitive():
         "MERGE (a) RETURN a",
         "DELETE a",
         "DETACH DELETE a",
-        "MATCH (a)-[:f]->(b) SET a.x = 1 RETURN a",
         "OPTIONAL MATCH (a)-[:f]->(b) RETURN a",
         "MATCH (a)-[:f]->(b) WITH a RETURN a",
         "UNWIND [1,2] AS x RETURN x",
@@ -112,6 +111,96 @@ def test_multi_pattern_match_unsupported():
 def test_unquoted_string_value_raises():
     with pytest.raises(CypherError):
         parse_cypher("MATCH (a)-[:f]->(b) WHERE a.status = bananas RETURN a")
+
+
+# ---------- SET clause parsing ----------
+
+
+def test_parse_set_literal():
+    from fmql.cypher.ast import LiteralExpr, SetItem
+
+    ast = parse_cypher("MATCH (t) SET t.x = 1")
+    assert ast.set_items == (SetItem(var="t", field="x", expr=LiteralExpr(value=1)),)
+    assert ast.returns == ()
+
+
+def test_parse_set_multiple_assignments():
+    ast = parse_cypher('MATCH (t) SET t.x = "a", t.y = 2')
+    assert len(ast.set_items) == 2
+    assert ast.set_items[0].field == "x"
+    assert ast.set_items[1].field == "y"
+
+
+def test_parse_set_qualified_ref():
+    from fmql.cypher.ast import FieldRef
+
+    ast = parse_cypher("MATCH (a)-[:f]->(b) SET a.next = b.next")
+    assert ast.set_items[0].expr == FieldRef(var="b", field="next")
+
+
+def test_parse_set_function_call():
+    from fmql.cypher.ast import CallExpr, FieldRef
+
+    ast = parse_cypher("MATCH (t) SET t.deps = slug(t.deps)")
+    expr = ast.set_items[0].expr
+    assert isinstance(expr, CallExpr)
+    assert expr.name == "slug"
+    assert expr.args == (FieldRef(var="t", field="deps"),)
+
+
+def test_parse_set_nested_function_call():
+    from fmql.cypher.ast import CallExpr
+
+    ast = parse_cypher('MATCH (t) SET t.x = field(resolve(t.deps, "id"), "slug")')
+    outer = ast.set_items[0].expr
+    assert isinstance(outer, CallExpr)
+    assert outer.name == "field"
+    inner = outer.args[0]
+    assert isinstance(inner, CallExpr)
+    assert inner.name == "resolve"
+
+
+def test_parse_set_with_where():
+    ast = parse_cypher('MATCH (t) WHERE t.status = "old" SET t.status = "archived"')
+    assert ast.where is not None
+    assert len(ast.set_items) == 1
+
+
+def test_parse_set_with_return():
+    ast = parse_cypher("MATCH (t) SET t.x = 1 RETURN t")
+    assert len(ast.set_items) == 1
+    assert len(ast.returns) == 1
+
+
+def test_parse_no_set_no_return_passes_grammar_but_validate_rejects():
+    from fmql.cypher.executor import compile_cypher_ast
+
+    ast = parse_cypher("MATCH (t)")
+    # Grammar permits this; validator inside the executor should reject.
+    # We don't need a workspace to validate — pass any minimal one.
+    # Use a dummy that won't be touched: validation happens before enumeration uses ws.
+    import tempfile
+
+    from fmql.workspace import Workspace as WS
+
+    with tempfile.TemporaryDirectory() as td:
+        ws = WS(td)
+        with pytest.raises(CypherError):
+            compile_cypher_ast(ast, ws)
+
+
+def test_parse_order_by_without_return_rejected():
+    from fmql.cypher.executor import compile_cypher_ast
+
+    ast = parse_cypher("MATCH (t) SET t.x = 1 ORDER BY t.x")
+    import tempfile
+
+    from fmql.workspace import Workspace as WS
+
+    with tempfile.TemporaryDirectory() as td:
+        ws = WS(td)
+        with pytest.raises(CypherError):
+            compile_cypher_ast(ast, ws)
 
 
 # ---------- execution ----------

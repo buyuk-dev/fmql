@@ -156,8 +156,12 @@ class Query:
                 "Query.cypher supports only single-variable RETURN; "
                 "use fmql.cypher.compile_cypher() or the `fmql cypher` CLI for richer results"
             )
-        result = compile_cypher_ast(ast, self.workspace)
-        id_set = frozenset(row[0] for row in result.rows)
+        execution = compile_cypher_ast(ast, self.workspace)
+        if execution.result is None:
+            raise CypherUnsupported(
+                "Query.cypher requires a RETURN clause; SET-only queries have no rows"
+            )
+        id_set = frozenset(row[0] for row in execution.result.rows)
         return Query(self.workspace, self._stages + (IdSetStage(ids=id_set),), self._order_by)
 
     def order_by(

@@ -4,11 +4,14 @@ import re
 from pathlib import Path
 from typing import Any, Optional
 
-from lark import Lark, Transformer, v_args
+from lark import Lark, Token, Transformer, v_args
 from lark.exceptions import LarkError, VisitError
 
 from fmql.cypher.ast import (
+    CallExpr,
     CypherAST,
+    FieldRef,
+    LiteralExpr,
     NodePat,
     Pattern,
     RelHop,
@@ -16,6 +19,8 @@ from fmql.cypher.ast import (
     ReturnField,
     ReturnItem,
     ReturnVar,
+    SetItem,
+    ValueExpr,
 )
 from fmql.dates import is_sentinel, resolve_sentinel
 from fmql.errors import CypherError, CypherUnsupported
@@ -41,7 +46,6 @@ _UNSUPPORTED_KEYWORDS: tuple[tuple[str, str], ...] = (
     (r"\bMERGE\b", "MERGE"),
     (r"\bDELETE\b", "DELETE"),
     (r"\bDETACH\b", "DETACH"),
-    (r"\bSET\b", "SET"),
     (r"\bOPTIONAL\s+MATCH\b", "OPTIONAL MATCH"),
     (r"\bWITH\b", "WITH"),
     (r"\bUNWIND\b", "UNWIND"),
@@ -89,6 +93,7 @@ class _Compiler(Transformer):
         returns: tuple[ReturnItem, ...] = ()
         where: Optional[ExprNode] = None
         order_by: tuple[OrderKey, ...] = ()
+        set_items: tuple[SetItem, ...] = ()
         for c in children[1:]:
             if isinstance(c, tuple) and c and c[0] == "__where__":
                 where = c[1]
@@ -96,7 +101,15 @@ class _Compiler(Transformer):
                 returns = c[1]
             elif isinstance(c, tuple) and c and c[0] == "__order__":
                 order_by = c[1]
-        return CypherAST(pattern=match_tree, where=where, returns=returns, order_by=order_by)
+            elif isinstance(c, tuple) and c and c[0] == "__set__":
+                set_items = c[1]
+        return CypherAST(
+            pattern=match_tree,
+            where=where,
+            returns=returns,
+            order_by=order_by,
+            set_items=set_items,
+        )
 
     def match_clause(self, children):
         for c in children:
@@ -176,6 +189,36 @@ class _Compiler(Transformer):
         if not keys:
             raise CypherError("ORDER BY requires at least one key")
         return ("__order__", keys)
+
+    def set_clause(self, children):
+        items = tuple(c for c in children if isinstance(c, SetItem))
+        if not items:
+            raise CypherError("SET requires at least one assignment")
+        return ("__set__", items)
+
+    @v_args(inline=True)
+    def set_item(self, qident, _eq, expr):
+        var, _, fname = str(qident).partition(".")
+        return SetItem(var=var, field=fname, expr=_to_value_expr(expr))
+
+    @v_args(inline=True)
+    def ve_ref(self, qident):
+        var, _, fname = str(qident).partition(".")
+        return FieldRef(var=var, field=fname)
+
+    def func_call(self, children):
+        name: Optional[str] = None
+        args: list[ValueExpr] = []
+        for c in children:
+            if isinstance(c, Token) and c.type == "IDENT" and name is None:
+                name = str(c)
+                continue
+            if isinstance(c, Token):
+                continue
+            args.append(_to_value_expr(c))
+        if name is None:
+            raise CypherError("function call missing identifier")
+        return CallExpr(name=name, args=tuple(args))
 
     def cypher_order_key(self, children):
         ref: Optional[str] = None
@@ -296,15 +339,17 @@ class _Compiler(Transformer):
         )
 
 
-def _is_ident(obj: Any) -> bool:
-    from lark import Token
+def _to_value_expr(obj: Any) -> ValueExpr:
+    if isinstance(obj, (LiteralExpr, FieldRef, CallExpr)):
+        return obj
+    return LiteralExpr(value=obj)
 
+
+def _is_ident(obj: Any) -> bool:
     return isinstance(obj, Token) and obj.type == "IDENT"
 
 
 def _is_kw_token(obj: Any) -> bool:
-    from lark import Token
-
     return isinstance(obj, Token)
 
 

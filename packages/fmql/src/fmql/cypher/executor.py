@@ -1,19 +1,27 @@
 from __future__ import annotations
 
 import math
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Optional
 
 from fmql.cypher.ast import (
+    CallExpr,
     CypherAST,
     CypherResult,
+    FieldRef,
+    LiteralExpr,
     Pattern,
     RelHop,
     ReturnCount,
     ReturnField,
     ReturnItem,
     ReturnVar,
+    SetItem,
+    ValueExpr,
 )
 from fmql.cypher.compile import parse_cypher
+from fmql.cypher.expr import EvalCtx, eval_value_expr, is_known_function
+from fmql.edits import EditOp, EditPlan
 from fmql.errors import CypherError
 from fmql.filters import Predicate, match
 from fmql.ordering import OrderKey, apply_order
@@ -24,22 +32,45 @@ from fmql.workspace import Workspace
 Binding = dict[str, PacketId]
 
 
+@dataclass
+class CypherExecution:
+    plan: Optional[EditPlan] = None
+    result: Optional[CypherResult] = None
+
+
 def compile_cypher(text: str, workspace: Workspace) -> CypherResult:
     ast = parse_cypher(text)
-    return compile_cypher_ast(ast, workspace)
+    execution = compile_cypher_ast(ast, workspace)
+    if execution.result is None:
+        raise CypherError("query has no RETURN clause; expected CypherResult")
+    return execution.result
 
 
-def compile_cypher_ast(ast: CypherAST, workspace: Workspace) -> CypherResult:
+def compile_cypher_ast(ast: CypherAST, workspace: Workspace) -> CypherExecution:
     _validate(ast)
     bindings = _enumerate(workspace, ast.pattern)
     if ast.where is not None:
         bindings = [b for b in bindings if _eval_scoped(ast.where, b, workspace)]
+
+    plan: Optional[EditPlan] = None
+    if ast.set_items:
+        plan = _build_edit_plan(ast.set_items, bindings, workspace)
+
     if ast.order_by:
         bindings = _sort_bindings(bindings, ast.order_by, workspace)
-    return _project(ast.returns, bindings, workspace, sort_rows=not ast.order_by)
+
+    result: Optional[CypherResult] = None
+    if ast.returns:
+        result = _project(ast.returns, bindings, workspace, sort_rows=not ast.order_by)
+
+    return CypherExecution(plan=plan, result=result)
 
 
 def _validate(ast: CypherAST) -> None:
+    if not ast.set_items and not ast.returns:
+        raise CypherError("query must contain at least one of SET or RETURN")
+    if ast.order_by and not ast.returns:
+        raise CypherError("ORDER BY requires a RETURN clause")
     vars_declared = {n.var for n in ast.pattern.nodes}
     for item in ast.returns:
         if item.var not in vars_declared:
@@ -50,6 +81,10 @@ def _validate(ast: CypherAST) -> None:
         var = key.field.split(".", 1)[0]
         if var not in vars_declared:
             raise CypherError(f"ORDER BY references undeclared variable {var!r}")
+    for set_item in ast.set_items:
+        if set_item.var not in vars_declared:
+            raise CypherError(f"SET references undeclared variable {set_item.var!r}")
+        _check_value_expr_vars(set_item.expr, vars_declared)
 
 
 def _check_where_vars(expr: ExprNode, declared: set[str]) -> None:
@@ -65,6 +100,22 @@ def _check_where_vars(expr: ExprNode, declared: set[str]) -> None:
             _check_where_vars(item, declared)
     elif isinstance(expr, NotNode):
         _check_where_vars(expr.item, declared)
+
+
+def _check_value_expr_vars(expr: ValueExpr, declared: set[str]) -> None:
+    if isinstance(expr, LiteralExpr):
+        return
+    if isinstance(expr, FieldRef):
+        if expr.var not in declared:
+            raise CypherError(f"SET expression references undeclared variable {expr.var!r}")
+        return
+    if isinstance(expr, CallExpr):
+        if not is_known_function(expr.name):
+            raise CypherError(f"unknown function in SET expression: {expr.name}()")
+        for arg in expr.args:
+            _check_value_expr_vars(arg, declared)
+        return
+    raise CypherError(f"unknown value expression: {type(expr).__name__}")
 
 
 def _enumerate(workspace: Workspace, pattern: Pattern) -> list[Binding]:
@@ -159,6 +210,39 @@ def _eval_scoped(expr: ExprNode, binding: Binding, workspace: Workspace) -> bool
     if isinstance(expr, NotNode):
         return not _eval_scoped(expr.item, binding, workspace)
     raise CypherError(f"unknown expression node: {type(expr).__name__}")
+
+
+def _build_edit_plan(
+    set_items: tuple[SetItem, ...],
+    bindings: list[Binding],
+    workspace: Workspace,
+) -> EditPlan:
+    accumulated: dict[PacketId, dict[str, Any]] = {}
+    order: list[PacketId] = []
+    for binding in bindings:
+        for item in set_items:
+            pid = binding.get(item.var)
+            if pid is None:
+                continue
+            ctx = EvalCtx(workspace=workspace, binding=binding, origin=pid)
+            value = eval_value_expr(item.expr, ctx)
+            assigns = accumulated.get(pid)
+            if assigns is None:
+                assigns = {}
+                accumulated[pid] = assigns
+                order.append(pid)
+            if item.field in assigns:
+                existing = assigns[item.field]
+                if existing != value:
+                    raise CypherError(
+                        f"SET conflict on {pid}.{item.field}: {existing!r} vs {value!r}"
+                    )
+            else:
+                assigns[item.field] = value
+    ops = [
+        EditOp(packet_id=pid, kind="set", args={"assignments": accumulated[pid]}) for pid in order
+    ]
+    return EditPlan(workspace=workspace, ops=ops)
 
 
 def _project(
