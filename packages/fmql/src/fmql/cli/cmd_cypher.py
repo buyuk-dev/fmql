@@ -8,7 +8,7 @@ from typing import Optional
 
 import typer
 
-from fmql.cli._edit_common import run_plan
+from fmql.cli._run import resolve_workspace, run_plan
 from fmql.cypher import compile_cypher_ast, parse_cypher
 from fmql.diagnostics import maybe_emit_warnings
 from fmql.errors import FmqlError
@@ -33,10 +33,10 @@ def _format_cell(v):
 
 
 def cypher_cmd(
-    path: Path = typer.Argument(
-        ..., exists=True, file_okay=False, dir_okay=True, resolve_path=True
-    ),
     query: str = typer.Argument(..., help="Cypher subset query (MATCH ... [SET ...] [RETURN ...])"),
+    workspace: Optional[Path] = typer.Option(
+        None, "--workspace", "-w", help="Workspace root (default: cwd)."
+    ),
     fmt: CypherFormat = typer.Option(CypherFormat.rows, "--format", "-f", help="Output format."),
     resolver: Optional[str] = typer.Option(
         None,
@@ -56,7 +56,8 @@ def cypher_cmd(
 ) -> None:
     try:
         default_r = resolver_by_name(resolver) if resolver else None
-        ws = Workspace(path, default_resolver=default_r)
+        ws_root = resolve_workspace(workspace)
+        ws = Workspace(ws_root, default_resolver=default_r)
         ast = parse_cypher(query)
         execution = compile_cypher_ast(ast, ws)
     except FmqlError as e:

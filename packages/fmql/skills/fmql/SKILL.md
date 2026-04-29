@@ -37,29 +37,26 @@ A "packet" is fmql's word for a single frontmatter file. Each packet has an `id`
 
 ## Command surface
 
-Eleven commands, grouped by phase:
+Every command takes `--workspace/-w ROOT` for the workspace; if omitted, the cwd is used.
 
 **Read:**
 | Command | Purpose | Example |
 |---|---|---|
-| `query` | Filter a workspace with qlang | `fmql query ./proj 'status = "active" AND priority > 2'` |
-| `describe` | Introspect a workspace (fields, types, samples) | `fmql describe ./proj --format json --top 10` |
-| `cypher` | Graph pattern query (Cypher subset) | `fmql cypher ./proj 'MATCH (a)-[:blocked_by*]->(a) RETURN a'` |
-| `search` | Run a search backend (default: grep) | `fmql search "alice" --backend grep --workspace ./proj -k 10` |
+| `query` | Filter a workspace with qlang | `fmql query 'status = "active" AND priority > 2' -w ./proj` |
+| `describe` | Introspect a workspace (fields, types, samples) | `fmql describe -w ./proj --format json --top 10` |
+| `cypher` | Graph pattern query (Cypher subset, optional SET/REMOVE) | `fmql cypher 'MATCH (a)-[:blocked_by*]->(a) RETURN a' -w ./proj` |
+| `subgraph` | Reachability closure as `{nodes, edges}` JSON | `fmql subgraph 'uuid = "task-1"' -w ./proj --follow blocked_by` |
+| `search` | Run a search backend (default: grep) | `fmql search "alice" -w ./proj -k 10` |
 
-**Edit** (single file or bulk via stdin):
+**Edit** (always Cypher-shaped, applies to whatever MATCH selects):
 | Command | Purpose | Example |
 |---|---|---|
-| `set` | Set frontmatter fields | `fmql set ./task-42.md status=done priority=1` |
-| `remove` | Delete frontmatter fields | `fmql remove ./task-42.md temp_notes` |
-| `rename` | Rename fields | `fmql rename ./task-42.md assignee=assigned_to` |
-| `append` | Append to a list-valued field | `fmql append ./task-42.md tags=urgent` |
-| `toggle` | Flip a boolean field | `fmql toggle ./task-42.md flagged` |
+| `update` | Pattern-match and edit packets (`MATCH ... [SET\|REMOVE]`) | `fmql update 'MATCH (t) WHERE t.status = "todo" SET t.status = "done"' -w ./proj` |
 
 **Index / discovery / utility:**
 | Command | Purpose | Example |
 |---|---|---|
-| `index` | Build an index for an indexed search backend | `fmql index ./proj --backend semantic` |
+| `index` | Build an index for an indexed search backend | `fmql index --backend semantic -w ./proj` |
 | `list-backends` | Enumerate installed search backends | `fmql list-backends --format json` |
 | `version` | Print fmql version | `fmql version` |
 
@@ -87,12 +84,12 @@ Case-insensitive keywords, SQL-ish, typed. The whole expression is a single shel
 **Examples:**
 
 ```bash
-fmql query ./proj 'status = "active" AND priority > 2'
-fmql query ./proj 'due_date < today AND status != "done"'
-fmql query ./proj 'tags CONTAINS "urgent" OR priority >= 3'
-fmql query ./proj 'status IN ["todo", "in_progress"]'
-fmql query ./proj 'NOT (assigned_to IS EMPTY)'
-fmql query ./proj 'title MATCHES "^\\[WIP\\]"'
+fmql query 'status = "active" AND priority > 2' -w ./proj
+fmql query 'due_date < today AND status != "done"' -w ./proj
+fmql query 'tags CONTAINS "urgent" OR priority >= 3' -w ./proj
+fmql query 'status IN ["todo", "in_progress"]' -w ./proj
+fmql query 'NOT (assigned_to IS EMPTY)' -w ./proj
+fmql query 'title MATCHES "^\\[WIP\\]"' -w ./proj
 ```
 
 **Type honesty — critical:** `priority > 2` only matches packets where `priority` is an int/float greater than 2. If one file has `priority: high` (string), it's silently excluded from the result — *not* coerced, *not* an error. This is intentional: mixed-type workspaces stay queryable without accidental conversions. If the user is confused about missing results, run `fmql describe` and look at the observed types per field.
@@ -105,13 +102,13 @@ Once you have a result set, you can walk references out of it:
 
 ```bash
 # Direct dependencies of task-42
-fmql query ./proj 'uuid = "task-42"' --follow blocked_by --depth 1
+fmql query 'uuid = "task-42"' -w ./proj --follow blocked_by --depth 1
 
 # Transitive dependency chain
-fmql query ./proj 'uuid = "task-42"' --follow blocked_by --depth '*'
+fmql query 'uuid = "task-42"' -w ./proj --follow blocked_by --depth '*'
 
 # What does task-42 unblock? (incoming edges)
-fmql query ./proj 'uuid = "task-42"' --follow blocked_by --direction reverse
+fmql query 'uuid = "task-42"' -w ./proj --follow blocked_by --direction reverse
 ```
 
 Pick a resolver with `--resolver`:
@@ -140,48 +137,71 @@ RETURN count(a)
 Node labels are parsed but ignored (fmql is schemaless). `WHERE` uses the same operators as qlang. Default output is TSV (`--format rows`); use `--format json` for structured parsing.
 
 ```bash
-fmql cypher ./proj 'MATCH (a)-[:blocked_by*]->(a) RETURN a'
-fmql cypher ./proj 'MATCH (a)-[:belongs_to]->(e) WHERE e.type = "epic" RETURN a, e'
+fmql cypher 'MATCH (a)-[:blocked_by*]->(a) RETURN a' -w ./proj
+fmql cypher 'MATCH (a)-[:belongs_to]->(e) WHERE e.type = "epic" RETURN a, e' -w ./proj
 ```
+
+### Virtual properties
+
+Three computed fields are exposed on every packet — `t.path`, `t.filename`, `t.slug`. They behave like frontmatter fields in `WHERE` / `SET` / `RETURN`. Use them when the user wants to filter or rewrite by file identity:
+
+```bash
+fmql cypher 'MATCH (t) WHERE t.path = "tasks/task-42.md" RETURN t' -w ./proj
+fmql update 'MATCH (t) WHERE t.title IS EMPTY SET t.title = t.slug' -w ./proj
+```
+
+Frontmatter wins on conflict — if a packet has its own `path` field, that value shadows the virtual one.
 
 ## Workspace introspection — always start here
 
 When you're handed an unfamiliar workspace, run `describe` first. It tells you which fields actually exist, what types they take, and a sample of distinct values. Writing qlang by guessing field names leads to empty results you'll blame on a bug; `describe` removes the guesswork:
 
 ```bash
-fmql describe ./proj --format json --top 10
+fmql describe -w ./proj --format json --top 10
 ```
 
 JSON output gives you `{field, types, sample_values, count}` per field — easy to scan, easy to parse.
 
-## Bulk edits — the read→edit pipeline
+## Bulk edits — `fmql update`
 
-The idiomatic mutation pattern is `query | edit`:
+All edits go through `fmql update`. Encode the *which packets* part as a `MATCH ... WHERE ...` filter, and the *what to change* part as `SET` / `REMOVE`. Required: at least one of `SET` or `REMOVE`. Forbidden in `update`: `RETURN` and `ORDER BY` — use `cypher` if you need to write *and* project in one shot.
 
 ```bash
 # Preview
-fmql query ./proj 'due_date < today AND status != "done"' \
-  | fmql set status=escalated --workspace ./proj --dry-run
+fmql update 'MATCH (t) WHERE t.due_date < today() AND t.status != "done" SET t.status = "escalated"' \
+  -w ./proj --dry-run
 
 # Apply after inspecting the diff
-fmql query ./proj 'due_date < today AND status != "done"' \
-  | fmql set status=escalated --workspace ./proj --yes
+fmql update 'MATCH (t) WHERE t.due_date < today() AND t.status != "done" SET t.status = "escalated"' \
+  -w ./proj --yes
 ```
 
-Why `--workspace` is required when piping: stdin carries packet paths, and the edit command needs the workspace root to resolve them.
+**SET operators:**
+- `SET t.f = expr` — replace.
+- `SET t.f += expr` — append to a list (creates `[expr]` if missing).
+- `SET t.f = NOT t.f` — toggle a boolean (broadcasts element-wise over lists).
+- `SET t.f = [x IN t.list WHERE pred (| projection)?]` — Neo4j-style list comprehension (filter + optional project).
+
+**REMOVE clause:** `REMOVE t.f, t.g, …` deletes those keys from each matched packet.
+
+**Renames** (no native syntax — compose SET + REMOVE):
+
+```bash
+fmql update 'MATCH (t) WHERE t.assignee IS NOT EMPTY
+             SET t.assigned_to = t.assignee REMOVE t.assignee' -w ./proj --yes
+```
+
+(The new key lands at the end of the YAML map; the old slot's position/comments are not preserved.)
+
+**Drop one item from a list:**
+
+```bash
+fmql update 'MATCH (t) SET t.tags = [x IN t.tags WHERE x <> "deprecated"]' -w ./proj
+```
 
 **Safety model.** Edits are format-preserving — `ruamel.yaml` round-trips the file, so comments, key order, quoting, and body bytes on untouched keys survive intact. But the files still get rewritten. Two guardrails:
 - `--dry-run` shows a unified diff without writing. **Use this first on any result set you can't eyeball manually.**
-- Without `--yes`, bulk edits print the diff and wait for confirmation at `/dev/tty`. In a CI/non-TTY environment, pass `--yes` or the edit will hang.
-
-**Value coercion.** CLI strings are auto-coerced: `status=done` → string, `priority=1` → int, `flagged=true` → bool, `due_date=2026-05-01` → date, `cleared=null` → None. To force a literal string that looks like another type, quote inside the value: `label='"123"'`.
-
-**Choose the right edit verb:**
-- `set` — any field, any type, overwrite existing.
-- `remove` — delete keys entirely (different from `set x=null`).
-- `rename` — change the key name, preserve the value.
-- `append` — push onto a list; creates the list if missing.
-- `toggle` — flip a boolean.
+- Without `--yes`, the diff prints and the command waits for confirmation at `/dev/tty`. In a CI/non-TTY environment, pass `--yes` or the edit will hang.
 
 ## Search backends
 
@@ -195,14 +215,14 @@ fmql list-backends --format json
 You can combine search with a structured filter in one pipeline:
 
 ```bash
-fmql query ./proj 'status = "in_progress"' --search "auth rewrite" --index grep
+fmql query 'status = "in_progress"' -w ./proj --search "auth rewrite" --index grep
 ```
 
 For meaning-based / hybrid retrieval over a notes vault, the separate `fmql-semantic` package registers a `semantic` backend — load the fmql-semantic skill when the user wants semantic search, RAG, embeddings, or hybrid BM25+dense retrieval.
 
 ## Output formats for agent parsing
 
-- `--format paths` (default for `query`, `search`) — one packet id per line. Pipes cleanly into `fmql set`, `fmql remove`, etc.
+- `--format paths` (default for `query`, `search`) — one packet id per line.
 - `--format json` — one JSON object per line (NDJSON-ish). `query` emits `{id, frontmatter}`; `search` emits `{id, score, snippet}`; `describe` emits one object describing the whole workspace.
 - `--format rows` — TSV. Default for `cypher`, available on `search`.
 
@@ -213,7 +233,7 @@ When you need to parse results, prefer JSON over paths: paths lose the field val
 **1. First look at an unfamiliar workspace**
 
 ```bash
-fmql describe ./vault --format json --top 10
+fmql describe -w ./vault --format json --top 10
 ```
 
 Read the output, identify the interesting fields, then narrow down with `query`.
@@ -221,24 +241,24 @@ Read the output, identify the interesting fields, then narrow down with `query`.
 **2. Bulk escalate stale work**
 
 ```bash
-fmql query ./proj 'status IN ["todo","in_progress"] AND due_date < today' \
-  | fmql set status=escalated --workspace ./proj --dry-run
+fmql update 'MATCH (t) WHERE t.status IN ["todo","in_progress"] AND t.due_date < today() SET t.status = "escalated"' \
+  -w ./proj --dry-run
 # inspect the diff, then:
-fmql query ./proj 'status IN ["todo","in_progress"] AND due_date < today' \
-  | fmql set status=escalated --workspace ./proj --yes
+fmql update 'MATCH (t) WHERE t.status IN ["todo","in_progress"] AND t.due_date < today() SET t.status = "escalated"' \
+  -w ./proj --yes
 ```
 
 **3. "What's blocking task-42?"**
 
 ```bash
-fmql query ./proj 'uuid = "task-42"' \
+fmql query 'uuid = "task-42"' -w ./proj \
   --follow blocked_by --depth '*' --resolver uuid --format json
 ```
 
 **4. Find dependency cycles**
 
 ```bash
-fmql cypher ./proj 'MATCH (a)-[:blocked_by*]->(a) RETURN a'
+fmql cypher 'MATCH (a)-[:blocked_by*]->(a) RETURN a' -w ./proj
 ```
 
 **5. Count completed tasks per sprint**

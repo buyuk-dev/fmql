@@ -27,11 +27,7 @@ def test_cypher_rows_single_hop(tmp_path: Path):
     runner = CliRunner()
     result = runner.invoke(
         app,
-        [
-            "cypher",
-            str(tmp_path),
-            "MATCH (a)-[:next]->(b) RETURN a, b",
-        ],
+        ["cypher", "MATCH (a)-[:next]->(b) RETURN a, b", "-w", str(tmp_path)],
     )
     assert result.exit_code == 0, result.output
     rows = sorted(tuple(ln.split("\t")) for ln in result.stdout.splitlines() if ln.strip())
@@ -47,11 +43,7 @@ def test_cypher_self_cycle(tmp_path: Path):
     runner = CliRunner()
     result = runner.invoke(
         app,
-        [
-            "cypher",
-            str(tmp_path),
-            "MATCH (a)-[:next*]->(a) RETURN a",
-        ],
+        ["cypher", "MATCH (a)-[:next*]->(a) RETURN a", "-w", str(tmp_path)],
     )
     assert result.exit_code == 0, result.output
     lines = sorted(ln for ln in result.stdout.splitlines() if ln.strip())
@@ -63,12 +55,17 @@ def test_cypher_count_scalar(tmp_path: Path):
     runner = CliRunner()
     result = runner.invoke(
         app,
-        [
-            "cypher",
-            str(tmp_path),
-            "MATCH (a)-[:next]->(b) RETURN count(a)",
-        ],
+        ["cypher", "MATCH (a)-[:next]->(b) RETURN count(a)", "-w", str(tmp_path)],
     )
+    assert result.exit_code == 0, result.output
+    assert result.stdout.strip() == "3"
+
+
+def test_cypher_defaults_workspace_to_cwd(tmp_path: Path, monkeypatch):
+    _write_cycle_by_path(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(app, ["cypher", "MATCH (a)-[:next]->(b) RETURN count(a)"])
     assert result.exit_code == 0, result.output
     assert result.stdout.strip() == "3"
 
@@ -80,8 +77,9 @@ def test_cypher_json_format(tmp_path: Path):
         app,
         [
             "cypher",
-            str(tmp_path),
             "MATCH (a)-[:next]->(b) RETURN a, b",
+            "-w",
+            str(tmp_path),
             "--format",
             "json",
         ],
@@ -101,8 +99,9 @@ def test_cypher_json_count(tmp_path: Path):
         app,
         [
             "cypher",
-            str(tmp_path),
             "MATCH (a)-[:next]->(b) RETURN count(a)",
+            "-w",
+            str(tmp_path),
             "--format",
             "json",
         ],
@@ -115,7 +114,7 @@ def test_cypher_json_count(tmp_path: Path):
 def test_cypher_parse_error_exits_2(tmp_path: Path):
     _write_cycle_by_path(tmp_path)
     runner = CliRunner()
-    result = runner.invoke(app, ["cypher", str(tmp_path), "not valid cypher"])
+    result = runner.invoke(app, ["cypher", "not valid cypher", "-w", str(tmp_path)])
     assert result.exit_code == 2
 
 
@@ -124,7 +123,7 @@ def test_cypher_unsupported_exits_2(tmp_path: Path):
     runner = CliRunner()
     result = runner.invoke(
         app,
-        ["cypher", str(tmp_path), "CREATE (a) RETURN a"],
+        ["cypher", "CREATE (a) RETURN a", "-w", str(tmp_path)],
     )
     assert result.exit_code == 2
 
@@ -134,7 +133,7 @@ def test_cypher_reverse_edge_exits_2(tmp_path: Path):
     runner = CliRunner()
     result = runner.invoke(
         app,
-        ["cypher", str(tmp_path), "MATCH (a)<-[:next]-(b) RETURN a"],
+        ["cypher", "MATCH (a)<-[:next]-(b) RETURN a", "-w", str(tmp_path)],
     )
     assert result.exit_code == 2
 
@@ -146,8 +145,9 @@ def test_cypher_zero_rows_emits_resolver_warning(tmp_path: Path):
         app,
         [
             "cypher",
-            str(tmp_path),
             "MATCH (a)-[:blocked_by]->(b) RETURN a, b",
+            "-w",
+            str(tmp_path),
             "--diagnose",
         ],
     )
@@ -164,8 +164,9 @@ def test_cypher_warning_suppressed_with_matching_resolver(tmp_path: Path):
         app,
         [
             "cypher",
-            str(tmp_path),
             "MATCH (a)-[:blocked_by]->(b) RETURN a, b",
+            "-w",
+            str(tmp_path),
             "--resolver",
             "uuid",
             "--diagnose",
@@ -176,15 +177,15 @@ def test_cypher_warning_suppressed_with_matching_resolver(tmp_path: Path):
 
 
 def test_cypher_no_diagnose_flag_is_silent(tmp_path: Path):
-    """Default invocation (no --diagnose) must never emit warnings."""
     _write_uuid_refs(tmp_path)
     runner = CliRunner()
     result = runner.invoke(
         app,
         [
             "cypher",
-            str(tmp_path),
             "MATCH (a)-[:blocked_by]->(b) RETURN a, b",
+            "-w",
+            str(tmp_path),
         ],
     )
     assert result.exit_code == 0, result.output
@@ -199,8 +200,9 @@ def test_cypher_diagnose_via_workspace_md(tmp_path: Path):
         app,
         [
             "cypher",
-            str(tmp_path),
             "MATCH (a)-[:blocked_by]->(b) RETURN a, b",
+            "-w",
+            str(tmp_path),
         ],
     )
     assert result.exit_code == 0, result.output
@@ -221,8 +223,9 @@ def test_cypher_with_set_writes_files(tmp_path: Path):
         app,
         [
             "cypher",
-            str(tmp_path),
             'MATCH (t) WHERE t.status = "old" SET t.status = "archived"',
+            "-w",
+            str(tmp_path),
             "--yes",
         ],
     )
@@ -240,8 +243,9 @@ def test_cypher_with_set_dry_run_does_not_write(tmp_path: Path):
         app,
         [
             "cypher",
-            str(tmp_path),
             'MATCH (t) WHERE t.status = "old" SET t.status = "archived"',
+            "-w",
+            str(tmp_path),
             "--dry-run",
         ],
     )
@@ -256,8 +260,9 @@ def test_cypher_set_with_return_runs_both(tmp_path: Path):
         app,
         [
             "cypher",
-            str(tmp_path),
             'MATCH (t) WHERE t.status = "old" SET t.status = "archived" RETURN t',
+            "-w",
+            str(tmp_path),
             "--yes",
         ],
     )

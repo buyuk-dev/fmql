@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Optional, Union
+from typing import Any, Literal, Optional, Union
 
 from fmql.ordering import OrderKey
 from fmql.query import ExprNode
@@ -53,7 +53,7 @@ class LiteralExpr:
 @dataclass(frozen=True)
 class FieldRef:
     var: str
-    field: str
+    field: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -62,7 +62,29 @@ class CallExpr:
     args: tuple["ValueExpr", ...]
 
 
-ValueExpr = Union[LiteralExpr, FieldRef, CallExpr]
+@dataclass(frozen=True)
+class UnaryOp:
+    op: str
+    operand: "ValueExpr"
+
+
+@dataclass(frozen=True)
+class ListLit:
+    items: tuple["ValueExpr", ...]
+
+
+@dataclass(frozen=True)
+class ListComp:
+    var: str
+    source: "ValueExpr"
+    predicate: Optional[ExprNode]
+    projection: Optional["ValueExpr"]
+
+
+ValueExpr = Union[LiteralExpr, FieldRef, CallExpr, UnaryOp, ListLit, ListComp]
+
+
+SetOp = Literal["set", "append"]
 
 
 @dataclass(frozen=True)
@@ -70,6 +92,13 @@ class SetItem:
     var: str
     field: str
     expr: ValueExpr
+    op: SetOp = "set"
+
+
+@dataclass(frozen=True)
+class RemoveItem:
+    var: str
+    field: str
 
 
 @dataclass(frozen=True)
@@ -79,6 +108,7 @@ class CypherAST:
     returns: tuple[ReturnItem, ...] = ()
     order_by: tuple[OrderKey, ...] = ()
     set_items: tuple[SetItem, ...] = ()
+    remove_items: tuple[RemoveItem, ...] = ()
 
 
 @dataclass(frozen=True)

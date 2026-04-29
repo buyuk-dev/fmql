@@ -126,3 +126,70 @@ def test_set_identical_value_collision_is_noop(make_workspace):
     assert execution.plan is not None
     pids = [op.packet_id for op in execution.plan.ops]
     assert pids == ["b.md"]
+
+
+def test_append_op_writes_list(make_workspace):
+    spec = {
+        "a.md": {"frontmatter": {"uuid": "a", "tags": ["one"]}, "body": "a\n"},
+        "b.md": {"frontmatter": {"uuid": "b"}, "body": "b\n"},
+    }
+    ws = make_workspace(spec)
+    ast = parse_cypher('MATCH (t) SET t.tags += "two"')
+    plan = compile_cypher_ast(ast, ws).plan
+    plan.apply(confirm=False)
+    assert ws.packets["a.md"].as_plain()["tags"] == ["one", "two"]
+    assert ws.packets["b.md"].as_plain()["tags"] == ["two"]
+
+
+def test_append_and_set_same_field_conflict(make_workspace):
+    spec = {"a.md": {"frontmatter": {"uuid": "a", "tags": []}, "body": "a\n"}}
+    ws = make_workspace(spec)
+    ast = parse_cypher('MATCH (t) SET t.tags = ["x"], t.tags += "y"')
+    with pytest.raises(CypherError, match="conflict"):
+        compile_cypher_ast(ast, ws)
+
+
+def test_set_list_literal_writes_list(make_workspace):
+    spec = {"a.md": {"frontmatter": {"uuid": "a"}, "body": "a\n"}}
+    ws = make_workspace(spec)
+    ast = parse_cypher('MATCH (t) SET t.tags = ["red", "green"]')
+    plan = compile_cypher_ast(ast, ws).plan
+    plan.apply(confirm=False)
+    assert ws.packets["a.md"].as_plain()["tags"] == ["red", "green"]
+
+
+def test_set_with_not_toggles_bool(make_workspace):
+    spec = {
+        "a.md": {"frontmatter": {"uuid": "a", "flag": True}, "body": "a\n"},
+        "b.md": {"frontmatter": {"uuid": "b", "flag": False}, "body": "b\n"},
+    }
+    ws = make_workspace(spec)
+    ast = parse_cypher("MATCH (t) SET t.flag = NOT t.flag")
+    plan = compile_cypher_ast(ast, ws).plan
+    plan.apply(confirm=False)
+    assert ws.packets["a.md"].as_plain()["flag"] is False
+    assert ws.packets["b.md"].as_plain()["flag"] is True
+
+
+def test_where_uses_virtual_path(make_workspace):
+    spec = {
+        "docs/a.md": {"frontmatter": {"uuid": "a"}, "body": "a\n"},
+        "docs/b.md": {"frontmatter": {"uuid": "b"}, "body": "b\n"},
+    }
+    ws = make_workspace(spec)
+    ast = parse_cypher('MATCH (t) WHERE t.path = "docs/a.md" SET t.label = "first"')
+    plan = compile_cypher_ast(ast, ws).plan
+    pids = [op.packet_id for op in plan.ops]
+    assert pids == ["docs/a.md"]
+
+
+def test_where_uses_virtual_slug(make_workspace):
+    spec = {
+        "docs/alpha.md": {"frontmatter": {"uuid": "a"}, "body": "a\n"},
+        "docs/bravo.md": {"frontmatter": {"uuid": "b"}, "body": "b\n"},
+    }
+    ws = make_workspace(spec)
+    ast = parse_cypher('MATCH (t) WHERE t.slug = "alpha" SET t.label = "x"')
+    plan = compile_cypher_ast(ast, ws).plan
+    pids = [op.packet_id for op in plan.ops]
+    assert pids == ["docs/alpha.md"]

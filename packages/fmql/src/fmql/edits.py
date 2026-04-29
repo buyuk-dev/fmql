@@ -248,7 +248,7 @@ class EditPlan:
             if preview_out is not None:
                 preview_out(self.preview())
             if confirm_fn is None:
-                from fmql.cli.stdin import confirm_prompt
+                from fmql.cli._run import confirm_prompt
 
                 ok = confirm_prompt()
             else:

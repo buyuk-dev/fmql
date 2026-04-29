@@ -7,8 +7,12 @@
 
 ## Wishlist
 
+- [ ] Implement `LIMIT N` syntax (based on Cypher) to cap the number of returned results. Currently rejected as unsupported in the Cypher subset (`packages/fmql/src/fmql/cypher/compile.py`); needs grammar/AST/executor support and likely a matching `--limit` flag on `fmql query`.
+
 - [ ] Pattern matching for inferring document type from its structure
+
 - [ ] filesystem level operations (inspecting filesystem metadata, filesystem ops: mv, cp, rm, ls, etc...)
+
 - [ ] Filesystem level operations could automatically doctor links when files move around or are deleted.
 
 

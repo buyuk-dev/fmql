@@ -1,19 +1,31 @@
 ?start: cypher
 
-cypher: match_clause where_clause? set_clause? return_clause? order_clause?
+cypher: match_clause where_clause? edit_clause* return_clause? order_clause?
 
 match_clause: MATCH_KW pattern
 
+edit_clause: set_clause | remove_clause
+
 set_clause: SET_KW set_item (COMMA set_item)*
-set_item: qualified_ident EQ value_expr
+set_item: qualified_ident set_op value_expr
+set_op: EQ | PLUS_EQ
+
+remove_clause: REMOVE_KW qualified_ident (COMMA qualified_ident)*
 
 ?value_expr: value_atom
            | func_call
+           | NOT_KW value_expr               -> ve_not
+           | list_lit
+           | list_comp
 
 ?value_atom: value
-           | qualified_ident   -> ve_ref
+           | qualified_ident                 -> ve_ref
 
 func_call: IDENT "(" [value_expr (COMMA value_expr)*] ")"
+
+list_lit: "[" [value_expr (COMMA value_expr)*] "]"
+
+list_comp: "[" IDENT IN_KW value_expr (WHERE_KW or_expr)? (PIPE value_expr)? "]"
 
 pattern: node (rel node)*
 
@@ -33,7 +45,6 @@ return_clause: RETURN_KW return_item (COMMA return_item)*
 order_clause: ORDER_KW BY_KW cypher_order_key (COMMA cypher_order_key)*
 cypher_order_key: order_ref direction_kw? nulls_spec?
 order_ref: qualified_ident   -> order_ref_qual
-         | IDENT              -> order_ref_var
 direction_kw: ASC_KW | DESC_KW
 nulls_spec: NULLS_KW FIRST_KW
           | NULLS_KW LAST_KW
@@ -58,7 +69,7 @@ predicate: qualified_ident cmp_op value                              -> p_binop
          | qualified_ident IS_KW EMPTY_KW                            -> p_empty
          | qualified_ident IS_KW NULL_KW                             -> p_null
 
-qualified_ident: IDENT "." IDENT
+qualified_ident: IDENT ("." IDENT)?
 
 cmp_op: EQ | NEQ | GTE | LTE | GT | LT | CONTAINS_KW | MATCHES_KW
 
@@ -66,12 +77,12 @@ value: ESCAPED_STRING   -> v_string
      | SIGNED_NUMBER    -> v_number
      | BOOL_KW          -> v_bool
      | DATE_OFFSET      -> v_date_offset
-     | IDENT            -> v_ident
 
 MATCH_KW.5: "MATCH"i
 WHERE_KW.5: "WHERE"i
 RETURN_KW.5: "RETURN"i
 SET_KW.5: "SET"i
+REMOVE_KW.5: "REMOVE"i
 COUNT_KW.5: "count"i
 ORDER_KW.5: "ORDER"i
 BY_KW.5: "BY"i
@@ -94,10 +105,12 @@ BOOL_KW.3: "true"i | "false"i
 DATE_OFFSET.3: /(today|now|yesterday|tomorrow)[+-]\d+[smhdw]/
 
 COMMA: ","
+PIPE: "|"
 
+PLUS_EQ: "+="
 GTE: ">="
 LTE: "<="
-NEQ: "!="
+NEQ: "!=" | "<>"
 EQ: "="
 GT: ">"
 LT: "<"

@@ -130,3 +130,62 @@ def test_resolve_unknown_resolver_name(id_ws):
     )
     with pytest.raises(CypherError):
         eval_value_expr(expr, _ctx(id_ws))
+
+
+def test_unary_not_bool():
+    from fmql.cypher.ast import LiteralExpr, UnaryOp
+    from fmql.cypher.expr import EvalCtx, eval_value_expr
+
+    expr = UnaryOp(op="not", operand=LiteralExpr(value=True))
+    assert eval_value_expr(expr, EvalCtx(workspace=None, binding={}, origin="x")) is False
+
+
+def test_unary_not_non_bool_errors():
+    from fmql.cypher.ast import LiteralExpr, UnaryOp
+    from fmql.cypher.expr import EvalCtx, eval_value_expr
+    from fmql.errors import CypherError
+
+    expr = UnaryOp(op="not", operand=LiteralExpr(value="hello"))
+    with pytest.raises(CypherError, match="NOT operand"):
+        eval_value_expr(expr, EvalCtx(workspace=None, binding={}, origin="x"))
+
+
+def test_unary_not_broadcasts_over_list():
+    from fmql.cypher.ast import LiteralExpr, UnaryOp
+    from fmql.cypher.expr import EvalCtx, eval_value_expr
+
+    expr = UnaryOp(op="not", operand=LiteralExpr(value=[True, False, True]))
+    out = eval_value_expr(expr, EvalCtx(workspace=None, binding={}, origin="x"))
+    assert out == [False, True, False]
+
+
+def test_list_lit_evaluates_each_item():
+    from fmql.cypher.ast import ListLit, LiteralExpr
+    from fmql.cypher.expr import EvalCtx, eval_value_expr
+
+    expr = ListLit(items=(LiteralExpr(value=1), LiteralExpr(value="x")))
+    assert eval_value_expr(expr, EvalCtx(workspace=None, binding={}, origin="x")) == [1, "x"]
+
+
+def test_virtual_path_field(id_ws):
+    expr = FieldRef(var="t", field="path")
+    assert eval_value_expr(expr, _ctx(id_ws, origin="tasks/a.md")) == "tasks/a.md"
+
+
+def test_virtual_filename_field(id_ws):
+    expr = FieldRef(var="t", field="filename")
+    assert eval_value_expr(expr, _ctx(id_ws, origin="tasks/a.md")) == "a.md"
+
+
+def test_virtual_slug_falls_back_to_stem(id_ws):
+    # tasks/a.md has frontmatter slug=alpha; frontmatter wins.
+    expr = FieldRef(var="t", field="slug")
+    assert eval_value_expr(expr, _ctx(id_ws, origin="tasks/a.md")) == "alpha"
+
+
+def test_virtual_slug_uses_stem_when_no_frontmatter_slug(make_workspace):
+    spec = {"docs/x.md": {"frontmatter": {"uuid": "x"}, "body": "x\n"}}
+    ws = make_workspace(spec)
+    expr = FieldRef(var="t", field="slug")
+    ctx = EvalCtx(workspace=ws, binding={"t": "docs/x.md"}, origin="docs/x.md")
+    assert eval_value_expr(expr, ctx) == "x"

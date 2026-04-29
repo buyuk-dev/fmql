@@ -11,18 +11,22 @@ from fmql.cypher.ast import (
     CallExpr,
     CypherAST,
     FieldRef,
+    ListComp,
+    ListLit,
     LiteralExpr,
     NodePat,
     Pattern,
     RelHop,
+    RemoveItem,
     ReturnCount,
     ReturnField,
     ReturnItem,
     ReturnVar,
     SetItem,
+    UnaryOp,
     ValueExpr,
 )
-from fmql.dates import is_sentinel, resolve_sentinel
+from fmql.dates import resolve_sentinel
 from fmql.errors import CypherError, CypherUnsupported
 from fmql.filters import Predicate
 from fmql.ordering import OrderKey
@@ -33,6 +37,7 @@ _GRAMMAR_PATH = Path(__file__).with_name("grammar.lark")
 _OP_MAP = {
     "=": "eq",
     "!=": "ne",
+    "<>": "ne",
     ">": "gt",
     ">=": "gte",
     "<": "lt",
@@ -83,7 +88,7 @@ def _get_parser() -> Lark:
     except NameError:
         pass
     grammar = _GRAMMAR_PATH.read_text(encoding="utf-8")
-    _PARSER = Lark(grammar, parser="lalr", start="start", maybe_placeholders=False)
+    _PARSER = Lark(grammar, parser="earley", start="start", maybe_placeholders=False)
     return _PARSER
 
 
@@ -93,7 +98,8 @@ class _Compiler(Transformer):
         returns: tuple[ReturnItem, ...] = ()
         where: Optional[ExprNode] = None
         order_by: tuple[OrderKey, ...] = ()
-        set_items: tuple[SetItem, ...] = ()
+        set_items: list[SetItem] = []
+        remove_items: list[RemoveItem] = []
         for c in children[1:]:
             if isinstance(c, tuple) and c and c[0] == "__where__":
                 where = c[1]
@@ -102,14 +108,20 @@ class _Compiler(Transformer):
             elif isinstance(c, tuple) and c and c[0] == "__order__":
                 order_by = c[1]
             elif isinstance(c, tuple) and c and c[0] == "__set__":
-                set_items = c[1]
+                set_items.extend(c[1])
+            elif isinstance(c, tuple) and c and c[0] == "__remove__":
+                remove_items.extend(c[1])
         return CypherAST(
             pattern=match_tree,
             where=where,
             returns=returns,
             order_by=order_by,
-            set_items=set_items,
+            set_items=tuple(set_items),
+            remove_items=tuple(remove_items),
         )
+
+    def edit_clause(self, children):
+        return children[0]
 
     def match_clause(self, children):
         for c in children:
@@ -196,15 +208,86 @@ class _Compiler(Transformer):
             raise CypherError("SET requires at least one assignment")
         return ("__set__", items)
 
+    def remove_clause(self, children):
+        items: list[RemoveItem] = []
+        for c in children:
+            if isinstance(c, Token):
+                continue
+            if isinstance(c, str):
+                var, _, fname = c.partition(".")
+                if not fname:
+                    raise CypherError(f"REMOVE target {c!r} must be qualified as <var>.<field>")
+                items.append(RemoveItem(var=var, field=fname))
+        if not items:
+            raise CypherError("REMOVE requires at least one field")
+        return ("__remove__", tuple(items))
+
     @v_args(inline=True)
-    def set_item(self, qident, _eq, expr):
+    def set_op(self, tok):
+        return str(tok)
+
+    def set_item(self, children):
+        qident = children[0]
+        op_str = children[1] if isinstance(children[1], str) else str(children[1])
+        expr = children[2]
         var, _, fname = str(qident).partition(".")
-        return SetItem(var=var, field=fname, expr=_to_value_expr(expr))
+        if not fname:
+            raise CypherError(f"SET target {qident!r} must be qualified as <var>.<field>")
+        op = "append" if op_str == "+=" else "set"
+        return SetItem(var=var, field=fname, expr=_to_value_expr(expr), op=op)
 
     @v_args(inline=True)
     def ve_ref(self, qident):
         var, _, fname = str(qident).partition(".")
-        return FieldRef(var=var, field=fname)
+        return FieldRef(var=var, field=fname or None)
+
+    @v_args(inline=True)
+    def ve_not(self, _kw, expr):
+        return UnaryOp(op="not", operand=_to_value_expr(expr))
+
+    def list_lit(self, children):
+        items = tuple(_to_value_expr(c) for c in children if not _is_kw_token(c))
+        return ListLit(items=items)
+
+    def list_comp(self, children):
+        # children: IDENT IN_KW value_expr (WHERE_KW or_expr)? (PIPE value_expr)?
+        var: Optional[str] = None
+        source: Optional[Any] = None
+        predicate: Optional[ExprNode] = None
+        projection: Optional[Any] = None
+        consumed_in = False
+        consumed_where = False
+        consumed_pipe = False
+        i = 0
+        toks = list(children)
+        while i < len(toks):
+            c = toks[i]
+            if isinstance(c, Token):
+                ttype = c.type
+                if ttype == "IDENT" and var is None and not consumed_in:
+                    var = str(c)
+                elif ttype == "IN_KW":
+                    consumed_in = True
+                elif ttype == "WHERE_KW":
+                    consumed_where = True
+                elif ttype == "PIPE":
+                    consumed_pipe = True
+            else:
+                if consumed_pipe and projection is None:
+                    projection = c
+                elif consumed_where and not consumed_pipe and predicate is None:
+                    predicate = c
+                elif consumed_in and source is None:
+                    source = c
+            i += 1
+        if var is None or source is None:
+            raise CypherError("malformed list comprehension")
+        return ListComp(
+            var=var,
+            source=_to_value_expr(source),
+            predicate=predicate,
+            projection=_to_value_expr(projection) if projection is not None else None,
+        )
 
     def func_call(self, children):
         name: Optional[str] = None
@@ -238,10 +321,6 @@ class _Compiler(Transformer):
     @v_args(inline=True)
     def order_ref_qual(self, qident):
         return ("__ref__", str(qident))
-
-    @v_args(inline=True)
-    def order_ref_var(self, ident):
-        return ("__ref__", str(ident))
 
     def direction_kw(self, children):
         tok = children[0]
@@ -283,9 +362,11 @@ class _Compiler(Transformer):
     def cmp_op(self, tok):
         return str(tok)
 
-    @v_args(inline=True)
-    def qualified_ident(self, var_tok, field_tok):
-        return f"{var_tok}.{field_tok}"
+    def qualified_ident(self, children):
+        idents = [str(c) for c in children if _is_ident(c)]
+        if len(idents) == 1:
+            return idents[0]
+        return f"{idents[0]}.{idents[1]}"
 
     @v_args(inline=True)
     def p_binop(self, qident, op, value):
@@ -329,18 +410,9 @@ class _Compiler(Transformer):
     def v_date_offset(self, tok):
         return resolve_sentinel(str(tok))
 
-    @v_args(inline=True)
-    def v_ident(self, tok):
-        name = str(tok)
-        if is_sentinel(name):
-            return resolve_sentinel(name)
-        raise CypherError(
-            f"unexpected bare identifier as value: {name!r}. " "String values must be quoted."
-        )
-
 
 def _to_value_expr(obj: Any) -> ValueExpr:
-    if isinstance(obj, (LiteralExpr, FieldRef, CallExpr)):
+    if isinstance(obj, (LiteralExpr, FieldRef, CallExpr, UnaryOp, ListLit, ListComp)):
         return obj
     return LiteralExpr(value=obj)
 

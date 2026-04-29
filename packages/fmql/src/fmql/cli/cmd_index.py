@@ -11,6 +11,7 @@ from typing import Optional
 import typer
 
 from fmql.cli._coerce import coerce_value
+from fmql.cli._run import resolve_workspace
 from fmql.errors import FmqlError
 from fmql.packet import Packet
 from fmql.qlang import compile_query
@@ -81,16 +82,11 @@ def _handle_cli_error(e: BaseException) -> None:
 
 
 def index_cmd(
-    workspace: Path = typer.Argument(
-        ...,
-        exists=True,
-        file_okay=False,
-        dir_okay=True,
-        resolve_path=True,
-        help="Workspace to index.",
-    ),
     backend: str = typer.Option(
         ..., "--backend", help="Backend name (must be an indexed backend)."
+    ),
+    workspace: Optional[Path] = typer.Option(
+        None, "--workspace", "-w", help="Workspace root (default: cwd)."
     ),
     out: Optional[str] = typer.Option(None, "--out", help="Index location (backend-defined)."),
     filter_query: Optional[str] = typer.Option(
@@ -121,7 +117,8 @@ def index_cmd(
         if force:
             opts.setdefault("force", True)
 
-        ws = Workspace(workspace)
+        ws_root = resolve_workspace(workspace)
+        ws = Workspace(ws_root)
         if filter_query is not None:
             q = compile_query(filter_query, ws)
             pids = set(q.ids())
@@ -207,11 +204,9 @@ def search_cmd(
     workspace: Optional[Path] = typer.Option(
         None,
         "--workspace",
-        exists=True,
-        file_okay=False,
-        dir_okay=True,
-        resolve_path=True,
-        help="Workspace (required for scan backends or to derive default index location).",
+        "-w",
+        help="Workspace root (default: cwd). Required for scan backends; "
+        "indexed backends can use it to derive a default --index location.",
     ),
     index_location: Optional[str] = typer.Option(
         None, "--index", help="Explicit index location (for indexed backends)."
@@ -229,7 +224,7 @@ def search_cmd(
         if is_indexed(be):
             location = index_location
             if location is None and workspace is not None:
-                ws = Workspace(workspace)
+                ws = Workspace(resolve_workspace(workspace))
                 location = be.default_location(ws)
             if location is None:
                 raise BackendKindError(
@@ -238,11 +233,7 @@ def search_cmd(
                 )
             hits = be.query(query, location, k=k, options=opts)
         else:
-            if workspace is None:
-                raise BackendKindError(
-                    f"backend {backend!r} is a scan backend; --workspace is required"
-                )
-            ws = Workspace(workspace)
+            ws = Workspace(resolve_workspace(workspace))
             hits = be.query(query, ws, k=k, options=opts)
         _emit_hits(hits, fmt)
     except BackendNotFoundError as e:

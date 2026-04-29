@@ -5,7 +5,7 @@ from typing import Optional
 
 import typer
 
-from fmql.cli._edit_common import cli_guard, run_plan
+from fmql.cli._run import cli_guard, resolve_workspace, run_plan
 from fmql.cypher import compile_cypher_ast, parse_cypher
 from fmql.diagnostics import maybe_emit_warnings
 from fmql.errors import CypherError
@@ -15,11 +15,10 @@ from fmql.workspace import Workspace
 
 @cli_guard
 def update_cmd(
-    path: Path = typer.Argument(
-        ..., exists=True, file_okay=False, dir_okay=True, resolve_path=True
+    query: str = typer.Argument(..., help="Cypher subset query with a SET and/or REMOVE clause."),
+    workspace: Optional[Path] = typer.Option(
+        None, "--workspace", "-w", help="Workspace root (default: cwd)."
     ),
-    query: str = typer.Argument(..., help="Cypher subset query with a SET clause."),
-    workspace: Optional[Path] = typer.Option(None, "--workspace", "-w"),
     resolver: Optional[str] = typer.Option(
         None,
         "--resolver",
@@ -34,12 +33,14 @@ def update_cmd(
     yes: bool = typer.Option(False, "--yes"),
 ) -> int:
     default_r = resolver_by_name(resolver) if resolver else None
-    ws_root = workspace.resolve() if workspace is not None else path
+    ws_root = resolve_workspace(workspace)
     ws = Workspace(ws_root, default_resolver=default_r)
 
     ast = parse_cypher(query)
-    if not ast.set_items:
-        raise CypherError("update requires a SET clause; use 'fmql cypher' for read-only queries")
+    if not ast.set_items and not ast.remove_items:
+        raise CypherError(
+            "update requires a SET or REMOVE clause; use 'fmql cypher' for read-only queries"
+        )
     if ast.returns or ast.order_by:
         raise CypherError(
             "update does not support RETURN or ORDER BY; use 'fmql cypher' for projections"

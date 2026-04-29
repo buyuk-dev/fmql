@@ -26,8 +26,9 @@ def test_update_migrates_ids_to_slugs(tmp_path: Path):
         app,
         [
             "update",
-            str(tmp_path),
             'MATCH (t) SET t.depends_on = field(resolve(t.depends_on, "id"), "slug")',
+            "-w",
+            str(tmp_path),
             "--yes",
         ],
     )
@@ -35,7 +36,6 @@ def test_update_migrates_ids_to_slugs(tmp_path: Path):
     contents = (tmp_path / "c.md").read_text(encoding="utf-8")
     assert "alpha" in contents
     assert "bravo" in contents
-    # Original ints should not appear in the depends_on block.
     assert "- 1\n" not in contents
     assert "- 8\n" not in contents
 
@@ -48,8 +48,9 @@ def test_update_dry_run_does_not_write(tmp_path: Path):
         app,
         [
             "update",
-            str(tmp_path),
             'MATCH (t) WHERE t.id = 17 SET t.label = "C"',
+            "-w",
+            str(tmp_path),
             "--dry-run",
         ],
     )
@@ -57,12 +58,12 @@ def test_update_dry_run_does_not_write(tmp_path: Path):
     assert (tmp_path / "c.md").read_text(encoding="utf-8") == before
 
 
-def test_update_without_set_errors(tmp_path: Path):
+def test_update_without_set_or_remove_errors(tmp_path: Path):
     _write_id_refs(tmp_path)
     runner = CliRunner()
     result = runner.invoke(
         app,
-        ["update", str(tmp_path), "MATCH (t) RETURN t"],
+        ["update", "MATCH (t) RETURN t", "-w", str(tmp_path)],
     )
     assert result.exit_code == 2
     assert "SET" in result.stderr or "SET" in result.output
@@ -73,27 +74,114 @@ def test_update_with_return_errors(tmp_path: Path):
     runner = CliRunner()
     result = runner.invoke(
         app,
-        ["update", str(tmp_path), "MATCH (t) SET t.x = 1 RETURN t"],
+        ["update", "MATCH (t) SET t.x = 1 RETURN t", "-w", str(tmp_path)],
     )
     assert result.exit_code == 2
 
 
-def test_update_workspace_flag_honored(tmp_path: Path):
+def test_update_defaults_workspace_to_cwd(tmp_path: Path, monkeypatch):
     _write_id_refs(tmp_path)
-    sub = tmp_path / "subset"
-    sub.mkdir()
+    monkeypatch.chdir(tmp_path)
     runner = CliRunner()
-    # Pass `path` arg as the subset dir but `--workspace` overrides.
+    result = runner.invoke(
+        app,
+        ["update", 'MATCH (t) WHERE t.id = 1 SET t.label = "first"', "--yes"],
+    )
+    assert result.exit_code == 0, (result.output, result.stderr)
+    assert "first" in (tmp_path / "a.md").read_text(encoding="utf-8")
+
+
+def test_update_append_operator(tmp_path: Path):
+    (tmp_path / "x.md").write_text("---\ntags:\n  - a\n---\n", encoding="utf-8")
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["update", 'MATCH (t) SET t.tags += "b"', "-w", str(tmp_path), "--yes"],
+    )
+    assert result.exit_code == 0, (result.output, result.stderr)
+    text = (tmp_path / "x.md").read_text(encoding="utf-8")
+    assert "- a" in text
+    assert "- b" in text
+
+
+def test_update_remove_clause(tmp_path: Path):
+    (tmp_path / "x.md").write_text("---\nstatus: todo\ntags:\n  - a\n---\n", encoding="utf-8")
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["update", "MATCH (t) REMOVE t.status", "-w", str(tmp_path), "--yes"],
+    )
+    assert result.exit_code == 0, (result.output, result.stderr)
+    text = (tmp_path / "x.md").read_text(encoding="utf-8")
+    assert "status:" not in text
+    assert "tags:" in text
+
+
+def test_update_not_operator_toggle(tmp_path: Path):
+    (tmp_path / "x.md").write_text("---\ndone: false\n---\n", encoding="utf-8")
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["update", "MATCH (t) SET t.done = NOT t.done", "-w", str(tmp_path), "--yes"],
+    )
+    assert result.exit_code == 0, (result.output, result.stderr)
+    assert "done: true" in (tmp_path / "x.md").read_text(encoding="utf-8")
+
+
+def test_update_list_comprehension_filter(tmp_path: Path):
+    (tmp_path / "x.md").write_text(
+        "---\ntags:\n  - keep\n  - drop\n  - keep2\n---\n", encoding="utf-8"
+    )
+    runner = CliRunner()
     result = runner.invoke(
         app,
         [
             "update",
-            str(sub),
-            "--workspace",
+            'MATCH (t) SET t.tags = [x IN t.tags WHERE x <> "drop"]',
+            "-w",
             str(tmp_path),
-            'MATCH (t) WHERE t.id = 1 SET t.label = "first"',
             "--yes",
         ],
     )
     assert result.exit_code == 0, (result.output, result.stderr)
-    assert "first" in (tmp_path / "a.md").read_text(encoding="utf-8")
+    text = (tmp_path / "x.md").read_text(encoding="utf-8")
+    assert "drop" not in text
+    assert "keep" in text
+
+
+def test_update_filter_by_virtual_path(tmp_path: Path):
+    (tmp_path / "a.md").write_text("---\nstatus: todo\n---\n", encoding="utf-8")
+    (tmp_path / "b.md").write_text("---\nstatus: todo\n---\n", encoding="utf-8")
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "update",
+            'MATCH (t) WHERE t.path = "a.md" SET t.status = "done"',
+            "-w",
+            str(tmp_path),
+            "--yes",
+        ],
+    )
+    assert result.exit_code == 0, (result.output, result.stderr)
+    assert "status: done" in (tmp_path / "a.md").read_text(encoding="utf-8")
+    assert "status: todo" in (tmp_path / "b.md").read_text(encoding="utf-8")
+
+
+def test_update_filter_by_virtual_slug(tmp_path: Path):
+    (tmp_path / "alpha.md").write_text("---\nstatus: todo\n---\n", encoding="utf-8")
+    (tmp_path / "bravo.md").write_text("---\nstatus: todo\n---\n", encoding="utf-8")
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "update",
+            'MATCH (t) WHERE t.slug = "alpha" SET t.status = "done"',
+            "-w",
+            str(tmp_path),
+            "--yes",
+        ],
+    )
+    assert result.exit_code == 0, (result.output, result.stderr)
+    assert "status: done" in (tmp_path / "alpha.md").read_text(encoding="utf-8")
+    assert "status: todo" in (tmp_path / "bravo.md").read_text(encoding="utf-8")

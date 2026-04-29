@@ -54,12 +54,23 @@ def test_search_k_limits_results(tmp_path: Path):
     assert len(lines) == 1
 
 
-def test_search_scan_backend_requires_workspace(tmp_path: Path):
+def test_search_defaults_workspace_to_cwd(tmp_path: Path, monkeypatch):
     _write_ws(tmp_path)
+    monkeypatch.chdir(tmp_path)
     runner = CliRunner()
     result = runner.invoke(app, ["search", "spec"])
-    assert result.exit_code == 2
-    assert "workspace" in result.stderr.lower() or "workspace" in result.output.lower()
+    assert result.exit_code == 0, result.output
+    lines = [ln for ln in result.stdout.splitlines() if ln.strip()]
+    assert lines == ["a.md"]
+
+
+def test_search_short_w_flag(tmp_path: Path):
+    _write_ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(app, ["search", "spec", "-w", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    lines = [ln for ln in result.stdout.splitlines() if ln.strip()]
+    assert lines == ["a.md"]
 
 
 def test_search_unknown_backend_errors(tmp_path: Path):

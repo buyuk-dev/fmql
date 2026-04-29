@@ -7,6 +7,7 @@ from typing import Optional, Union
 
 import typer
 
+from fmql.cli._run import resolve_workspace
 from fmql.diagnostics import maybe_emit_warnings
 from fmql.errors import FmqlError
 from fmql.qlang import compile_query
@@ -38,10 +39,10 @@ def _parse_depth(depth: str) -> Union[int, str]:
 
 
 def query_cmd(
-    path: Path = typer.Argument(
-        ..., exists=True, file_okay=False, dir_okay=True, resolve_path=True
-    ),
     query: str = typer.Argument(..., help="qlang expression or '*' for all"),
+    workspace: Optional[Path] = typer.Option(
+        None, "--workspace", "-w", help="Workspace root (default: cwd)."
+    ),
     fmt: OutputFormat = typer.Option(OutputFormat.paths, "--format", "-f", help="Output format."),
     follow: Optional[str] = typer.Option(None, "--follow", help="Field name to traverse."),
     depth: str = typer.Option("1", "--depth", help="Hops to traverse: integer or '*' (or 'all')."),
@@ -70,7 +71,8 @@ def query_cmd(
 ) -> None:
     r = None
     try:
-        ws = Workspace(path)
+        ws_root = resolve_workspace(workspace)
+        ws = Workspace(ws_root)
         q = compile_query(query, ws)
         if search is not None:
             q = q.search(search, index=index, location=index_location)

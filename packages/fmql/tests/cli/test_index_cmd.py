@@ -31,7 +31,7 @@ def test_list_backends_json():
 def test_index_rejects_scan_backend(tmp_path: Path):
     (tmp_path / "a.md").write_text("---\n---\nbody\n", encoding="utf-8")
     runner = CliRunner()
-    result = runner.invoke(app, ["index", str(tmp_path), "--backend", "grep"])
+    result = runner.invoke(app, ["index", "--backend", "grep", "-w", str(tmp_path)])
     assert result.exit_code == 2
     err = result.stderr if result.stderr else result.output
     assert "scan" in err.lower() or "grep" in err.lower()
@@ -39,5 +39,5 @@ def test_index_rejects_scan_backend(tmp_path: Path):
 
 def test_index_unknown_backend(tmp_path: Path):
     runner = CliRunner()
-    result = runner.invoke(app, ["index", str(tmp_path), "--backend", "nope"])
+    result = runner.invoke(app, ["index", "--backend", "nope", "-w", str(tmp_path)])
     assert result.exit_code == 2

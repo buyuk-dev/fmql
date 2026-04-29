@@ -23,8 +23,9 @@ def test_subgraph_forward_single_hop(tmp_path: Path):
         app,
         [
             "subgraph",
-            str(tmp_path),
             'uuid = "c"',
+            "-w",
+            str(tmp_path),
             "--follow",
             "blocked_by",
             "--direction",
@@ -48,8 +49,9 @@ def test_subgraph_forward_depth_star_full_closure(tmp_path: Path):
         app,
         [
             "subgraph",
-            str(tmp_path),
             'uuid = "c"',
+            "-w",
+            str(tmp_path),
             "--follow",
             "blocked_by",
             "--resolver",
@@ -72,8 +74,9 @@ def test_subgraph_reverse_direction(tmp_path: Path):
         app,
         [
             "subgraph",
-            str(tmp_path),
             'uuid = "a"',
+            "-w",
+            str(tmp_path),
             "--follow",
             "blocked_by",
             "--direction",
@@ -98,8 +101,9 @@ def test_subgraph_ids_only(tmp_path: Path):
         app,
         [
             "subgraph",
-            str(tmp_path),
             'uuid = "c"',
+            "-w",
+            str(tmp_path),
             "--follow",
             "blocked_by",
             "--resolver",
@@ -120,8 +124,9 @@ def test_subgraph_no_include_origin(tmp_path: Path):
         app,
         [
             "subgraph",
-            str(tmp_path),
             'uuid = "c"',
+            "-w",
+            str(tmp_path),
             "--follow",
             "blocked_by",
             "--resolver",
@@ -142,8 +147,9 @@ def test_subgraph_resolver_mismatch_emits_warning(tmp_path: Path):
         app,
         [
             "subgraph",
-            str(tmp_path),
             'uuid = "c"',
+            "-w",
+            str(tmp_path),
             "--follow",
             "blocked_by",
             "--diagnose",
@@ -157,15 +163,15 @@ def test_subgraph_resolver_mismatch_emits_warning(tmp_path: Path):
 
 
 def test_subgraph_no_diagnose_flag_is_silent(tmp_path: Path):
-    """Default invocation (no --diagnose) must never emit warnings, even on misbinds."""
     _write_blocked_ws(tmp_path)
     runner = CliRunner()
     result = runner.invoke(
         app,
         [
             "subgraph",
-            str(tmp_path),
             'uuid = "c"',
+            "-w",
+            str(tmp_path),
             "--follow",
             "blocked_by",
         ],
@@ -182,8 +188,9 @@ def test_subgraph_diagnose_via_workspace_md(tmp_path: Path):
         app,
         [
             "subgraph",
-            str(tmp_path),
             'uuid = "c"',
+            "-w",
+            str(tmp_path),
             "--follow",
             "blocked_by",
         ],
@@ -202,8 +209,9 @@ def test_subgraph_warning_fires_on_partial_mismatch_with_nonempty_edges(tmp_path
         app,
         [
             "subgraph",
-            str(tmp_path),
             'uuid = "b"',
+            "-w",
+            str(tmp_path),
             "--follow",
             "blocked_by",
             "--resolver",
@@ -224,8 +232,9 @@ def test_subgraph_invalid_depth_exits_2(tmp_path: Path):
         app,
         [
             "subgraph",
-            str(tmp_path),
             'uuid = "c"',
+            "-w",
+            str(tmp_path),
             "--follow",
             "blocked_by",
             "--depth",
@@ -244,8 +253,9 @@ def test_subgraph_format_cytoscape(tmp_path: Path):
         app,
         [
             "subgraph",
-            str(tmp_path),
             'uuid = "c"',
+            "-w",
+            str(tmp_path),
             "--follow",
             "blocked_by",
             "--resolver",
@@ -274,8 +284,9 @@ def test_subgraph_format_cytoscape_ids_only(tmp_path: Path):
         app,
         [
             "subgraph",
-            str(tmp_path),
             'uuid = "c"',
+            "-w",
+            str(tmp_path),
             "--follow",
             "blocked_by",
             "--resolver",
@@ -296,8 +307,9 @@ def test_subgraph_format_raw_matches_default(tmp_path: Path):
     runner = CliRunner()
     args = [
         "subgraph",
-        str(tmp_path),
         'uuid = "c"',
+        "-w",
+        str(tmp_path),
         "--follow",
         "blocked_by",
         "--resolver",
@@ -317,8 +329,9 @@ def test_subgraph_format_unknown_exits_2(tmp_path: Path):
         app,
         [
             "subgraph",
-            str(tmp_path),
             'uuid = "c"',
+            "-w",
+            str(tmp_path),
             "--follow",
             "blocked_by",
             "--resolver",

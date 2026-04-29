@@ -9,21 +9,30 @@ from fmql.cypher.ast import (
     CypherAST,
     CypherResult,
     FieldRef,
+    ListComp,
+    ListLit,
     LiteralExpr,
     Pattern,
     RelHop,
+    RemoveItem,
     ReturnCount,
     ReturnField,
     ReturnItem,
     ReturnVar,
     SetItem,
+    UnaryOp,
     ValueExpr,
 )
 from fmql.cypher.compile import parse_cypher
-from fmql.cypher.expr import EvalCtx, eval_value_expr, is_known_function
+from fmql.cypher.expr import (
+    EvalCtx,
+    eval_predicate,
+    eval_value_expr,
+    is_known_function,
+    packet_field,
+)
 from fmql.edits import EditOp, EditPlan
 from fmql.errors import CypherError
-from fmql.filters import Predicate, match
 from fmql.ordering import OrderKey, apply_order
 from fmql.query import AndNode, ExprNode, NotNode, OrNode, PredNode
 from fmql.types import PacketId, Resolver
@@ -50,11 +59,17 @@ def compile_cypher_ast(ast: CypherAST, workspace: Workspace) -> CypherExecution:
     _validate(ast)
     bindings = _enumerate(workspace, ast.pattern)
     if ast.where is not None:
-        bindings = [b for b in bindings if _eval_scoped(ast.where, b, workspace)]
+        bindings = [
+            b
+            for b in bindings
+            if eval_predicate(
+                ast.where, EvalCtx(workspace=workspace, binding=b, origin=_first_pid(b))
+            )
+        ]
 
     plan: Optional[EditPlan] = None
-    if ast.set_items:
-        plan = _build_edit_plan(ast.set_items, bindings, workspace)
+    if ast.set_items or ast.remove_items:
+        plan = _build_edit_plan(ast.set_items, ast.remove_items, bindings, workspace)
 
     if ast.order_by:
         bindings = _sort_bindings(bindings, ast.order_by, workspace)
@@ -66,9 +81,15 @@ def compile_cypher_ast(ast: CypherAST, workspace: Workspace) -> CypherExecution:
     return CypherExecution(plan=plan, result=result)
 
 
+def _first_pid(binding: Binding) -> PacketId:
+    for v in binding.values():
+        return v
+    raise CypherError("empty binding")
+
+
 def _validate(ast: CypherAST) -> None:
-    if not ast.set_items and not ast.returns:
-        raise CypherError("query must contain at least one of SET or RETURN")
+    if not ast.set_items and not ast.remove_items and not ast.returns:
+        raise CypherError("query must contain at least one of SET, REMOVE, or RETURN")
     if ast.order_by and not ast.returns:
         raise CypherError("ORDER BY requires a RETURN clause")
     vars_declared = {n.var for n in ast.pattern.nodes}
@@ -85,6 +106,9 @@ def _validate(ast: CypherAST) -> None:
         if set_item.var not in vars_declared:
             raise CypherError(f"SET references undeclared variable {set_item.var!r}")
         _check_value_expr_vars(set_item.expr, vars_declared)
+    for remove_item in ast.remove_items:
+        if remove_item.var not in vars_declared:
+            raise CypherError(f"REMOVE references undeclared variable {remove_item.var!r}")
 
 
 def _check_where_vars(expr: ExprNode, declared: set[str]) -> None:
@@ -115,7 +139,35 @@ def _check_value_expr_vars(expr: ValueExpr, declared: set[str]) -> None:
         for arg in expr.args:
             _check_value_expr_vars(arg, declared)
         return
+    if isinstance(expr, UnaryOp):
+        _check_value_expr_vars(expr.operand, declared)
+        return
+    if isinstance(expr, ListLit):
+        for item in expr.items:
+            _check_value_expr_vars(item, declared)
+        return
+    if isinstance(expr, ListComp):
+        _check_value_expr_vars(expr.source, declared)
+        inner = declared | {expr.var}
+        if expr.predicate is not None:
+            _check_listcomp_pred_vars(expr.predicate, inner)
+        if expr.projection is not None:
+            _check_value_expr_vars(expr.projection, inner)
+        return
     raise CypherError(f"unknown value expression: {type(expr).__name__}")
+
+
+def _check_listcomp_pred_vars(expr: ExprNode, declared: set[str]) -> None:
+    if isinstance(expr, PredNode):
+        field = expr.predicate.field
+        var = field.split(".", 1)[0]
+        if var not in declared:
+            raise CypherError(f"list-comp predicate references undeclared variable {var!r}")
+    elif isinstance(expr, (AndNode, OrNode)):
+        for item in expr.items:
+            _check_listcomp_pred_vars(item, declared)
+    elif isinstance(expr, NotNode):
+        _check_listcomp_pred_vars(expr.item, declared)
 
 
 def _enumerate(workspace: Workspace, pattern: Pattern) -> list[Binding]:
@@ -191,57 +243,86 @@ def _neighbors(
     return out
 
 
-def _eval_scoped(expr: ExprNode, binding: Binding, workspace: Workspace) -> bool:
-    if isinstance(expr, PredNode):
-        qfield = expr.predicate.field
-        var, _, field = qfield.partition(".")
-        pid = binding.get(var)
-        if pid is None:
-            return False
-        packet = workspace.packets.get(pid)
-        if packet is None:
-            return False
-        local = Predicate(field=field, op=expr.predicate.op, value=expr.predicate.value)
-        return match(packet, local)
-    if isinstance(expr, AndNode):
-        return all(_eval_scoped(e, binding, workspace) for e in expr.items)
-    if isinstance(expr, OrNode):
-        return any(_eval_scoped(e, binding, workspace) for e in expr.items)
-    if isinstance(expr, NotNode):
-        return not _eval_scoped(expr.item, binding, workspace)
-    raise CypherError(f"unknown expression node: {type(expr).__name__}")
-
-
 def _build_edit_plan(
     set_items: tuple[SetItem, ...],
+    remove_items: tuple[RemoveItem, ...],
     bindings: list[Binding],
     workspace: Workspace,
 ) -> EditPlan:
-    accumulated: dict[PacketId, dict[str, Any]] = {}
+    set_assigns: dict[PacketId, dict[str, Any]] = {}
+    appends: dict[PacketId, list[tuple[str, Any]]] = {}
+    removes: dict[PacketId, list[str]] = {}
+    field_kind: dict[tuple[PacketId, str], str] = {}
     order: list[PacketId] = []
+    seen: set[PacketId] = set()
+
+    def touch(pid: PacketId) -> None:
+        if pid not in seen:
+            seen.add(pid)
+            order.append(pid)
+
     for binding in bindings:
         for item in set_items:
             pid = binding.get(item.var)
             if pid is None:
                 continue
+            touch(pid)
             ctx = EvalCtx(workspace=workspace, binding=binding, origin=pid)
             value = eval_value_expr(item.expr, ctx)
-            assigns = accumulated.get(pid)
-            if assigns is None:
-                assigns = {}
-                accumulated[pid] = assigns
-                order.append(pid)
-            if item.field in assigns:
-                existing = assigns[item.field]
-                if existing != value:
-                    raise CypherError(
-                        f"SET conflict on {pid}.{item.field}: {existing!r} vs {value!r}"
-                    )
+            kind = "append" if item.op == "append" else "set"
+            key = (pid, item.field)
+            existing = field_kind.get(key)
+            if existing is None:
+                field_kind[key] = kind
+            elif existing != kind:
+                raise CypherError(
+                    f"SET conflict on {pid}.{item.field}: cannot mix '{existing}' and '{kind}'"
+                )
+            if kind == "append":
+                appends.setdefault(pid, []).append((item.field, value))
             else:
-                assigns[item.field] = value
-    ops = [
-        EditOp(packet_id=pid, kind="set", args={"assignments": accumulated[pid]}) for pid in order
-    ]
+                pid_assigns = set_assigns.setdefault(pid, {})
+                if item.field in pid_assigns:
+                    prev = pid_assigns[item.field]
+                    if prev != value:
+                        raise CypherError(
+                            f"SET conflict on {pid}.{item.field}: {prev!r} vs {value!r}"
+                        )
+                else:
+                    pid_assigns[item.field] = value
+        for r in remove_items:
+            pid = binding.get(r.var)
+            if pid is None:
+                continue
+            touch(pid)
+            key = (pid, r.field)
+            existing = field_kind.get(key)
+            if existing is None:
+                field_kind[key] = "remove"
+            elif existing != "remove":
+                raise CypherError(
+                    f"SET/REMOVE conflict on {pid}.{r.field}: cannot both modify and remove"
+                )
+            bucket = removes.setdefault(pid, [])
+            if r.field not in bucket:
+                bucket.append(r.field)
+
+    ops: list[EditOp] = []
+    for pid in order:
+        rm = removes.get(pid)
+        if rm:
+            ops.append(EditOp(packet_id=pid, kind="remove", args={"fields": list(rm)}))
+        assigns = set_assigns.get(pid)
+        if assigns:
+            ops.append(EditOp(packet_id=pid, kind="set", args={"assignments": dict(assigns)}))
+        for field_name, value in appends.get(pid, []):
+            ops.append(
+                EditOp(
+                    packet_id=pid,
+                    kind="append",
+                    args={"assignments": {field_name: value}},
+                )
+            )
     return EditPlan(workspace=workspace, ops=ops)
 
 
@@ -276,20 +357,24 @@ def _sort_bindings(
     workspace: Workspace,
 ) -> list[Binding]:
     def extract(binding: Binding, key: OrderKey) -> tuple[Any, bool]:
+        from fmql.cypher.expr import RESERVED_VIRTUAL_FIELDS
+
         ref = key.field
-        var, _, field = ref.partition(".")
+        var, _, fname = ref.partition(".")
         pid = binding.get(var)
         if pid is None:
             return (None, True)
-        if not field:
+        if not fname:
             return (pid, False)
         packet = workspace.packets.get(pid)
         if packet is None:
             return (None, True)
         plain = packet.as_plain()
-        if field not in plain:
-            return (None, True)
-        return (plain[field], False)
+        if fname in plain:
+            return (plain[fname], False)
+        if fname in RESERVED_VIRTUAL_FIELDS:
+            return (packet_field(workspace, pid, fname), False)
+        return (None, True)
 
     return apply_order(bindings, keys, extract)
 
@@ -309,10 +394,7 @@ def _project_item(item: ReturnItem, binding: Binding, workspace: Workspace) -> A
     if isinstance(item, ReturnVar):
         return pid
     if isinstance(item, ReturnField):
-        packet = workspace.packets.get(pid)
-        if packet is None:
-            return None
-        return packet.as_plain().get(item.field)
+        return packet_field(workspace, pid, item.field)
     raise CypherError(f"unprojectable item: {type(item).__name__}")
 
 

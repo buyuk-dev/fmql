@@ -133,15 +133,15 @@ fmql query ./vault 'type = "note" AND tags CONTAINS "review"' \
 
 ## Integrating with downstream fmql commands
 
-Because `fmql search --format paths` emits one packet id per line, you can pipe hits into any fmql edit:
+`fmql query --search` lets you compose semantic retrieval with structured filters in one step. To then bulk-edit the matches, encode the same filter inside a `fmql update` MATCH/WHERE — `update` reads the workspace directly rather than ingesting a stdin path list:
 
 ```bash
-# Mark semantically-matched notes as reviewed
-fmql search "migration strategy" --backend semantic --workspace ./vault -k 20 --format paths \
-  | fmql set reviewed=true --workspace ./vault --dry-run
+# Inspect semantically-matched notes that are also unreviewed
+fmql query 'reviewed != true' -w ./vault \
+  --search "migration strategy" --index semantic --index-location ./vault/.fmql/semantic.db
 ```
 
-For code that feeds hits to an LLM (RAG), prefer `--format json` so you get id + score + snippet in one structured stream.
+For code that feeds hits to an LLM (RAG), use `fmql search --format json` so you get id + score + snippet in one structured stream.
 
 ## Rerank — when it's worth it
 

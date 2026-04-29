@@ -7,6 +7,7 @@ from typing import List, Optional, Union
 
 import typer
 
+from fmql.cli._run import resolve_workspace
 from fmql.diagnostics import maybe_emit_warnings
 from fmql.errors import FmqlError
 from fmql.qlang import compile_query
@@ -35,10 +36,10 @@ def _parse_depth(depth: str) -> Union[int, str]:
 
 
 def subgraph_cmd(
-    path: Path = typer.Argument(
-        ..., exists=True, file_okay=False, dir_okay=True, resolve_path=True
-    ),
     query: str = typer.Argument(..., help="qlang expression selecting seed packets (or '*')."),
+    workspace: Optional[Path] = typer.Option(
+        None, "--workspace", "-w", help="Workspace root (default: cwd)."
+    ),
     fields: List[str] = typer.Option(
         ...,
         "--follow",
@@ -72,7 +73,8 @@ def subgraph_cmd(
     ),
 ) -> None:
     try:
-        ws = Workspace(path)
+        ws_root = resolve_workspace(workspace)
+        ws = Workspace(ws_root)
         seeds = compile_query(query, ws).ids()
         d = _parse_depth(depth)
         r = resolver_by_name(resolver) if resolver else None

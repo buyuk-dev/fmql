@@ -25,7 +25,9 @@ def _write_ws(root: Path) -> None:
 def test_query_paths_format(tmp_path: Path):
     _write_ws(tmp_path)
     runner = CliRunner()
-    result = runner.invoke(app, ["query", str(tmp_path), 'status = "active" AND priority > 2'])
+    result = runner.invoke(
+        app, ["query", 'status = "active" AND priority > 2', "-w", str(tmp_path)]
+    )
     assert result.exit_code == 0, result.output
     lines = [ln for ln in result.stdout.splitlines() if ln.strip()]
     assert lines == ["tasks/a.md"]
@@ -34,7 +36,7 @@ def test_query_paths_format(tmp_path: Path):
 def test_query_json_format(tmp_path: Path):
     _write_ws(tmp_path)
     runner = CliRunner()
-    result = runner.invoke(app, ["query", str(tmp_path), "*", "--format", "json"])
+    result = runner.invoke(app, ["query", "*", "-w", str(tmp_path), "--format", "json"])
     assert result.exit_code == 0, result.output
     rows = [json.loads(ln) for ln in result.stdout.splitlines() if ln.strip()]
     assert len(rows) == 3
@@ -47,8 +49,18 @@ def test_query_json_format(tmp_path: Path):
 def test_query_star_prints_all(tmp_path: Path):
     _write_ws(tmp_path)
     runner = CliRunner()
-    result = runner.invoke(app, ["query", str(tmp_path), "*"])
+    result = runner.invoke(app, ["query", "*", "-w", str(tmp_path)])
     assert result.exit_code == 0
+    lines = sorted(ln for ln in result.stdout.splitlines() if ln.strip())
+    assert lines == ["tasks/a.md", "tasks/b.md", "tasks/c.md"]
+
+
+def test_query_defaults_workspace_to_cwd(tmp_path: Path, monkeypatch):
+    _write_ws(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(app, ["query", "*"])
+    assert result.exit_code == 0, result.output
     lines = sorted(ln for ln in result.stdout.splitlines() if ln.strip())
     assert lines == ["tasks/a.md", "tasks/b.md", "tasks/c.md"]
 
@@ -56,27 +68,25 @@ def test_query_star_prints_all(tmp_path: Path):
 def test_query_bad_syntax_exits_nonzero(tmp_path: Path):
     _write_ws(tmp_path)
     runner = CliRunner()
-    result = runner.invoke(app, ["query", str(tmp_path), "this is not valid"])
+    result = runner.invoke(app, ["query", "this is not valid", "-w", str(tmp_path)])
     assert result.exit_code == 2
 
 
 def test_query_order_by_desc(tmp_path: Path):
     _write_ws(tmp_path)
     runner = CliRunner()
-    result = runner.invoke(app, ["query", str(tmp_path), "* ORDER BY priority DESC"])
+    result = runner.invoke(app, ["query", "* ORDER BY priority DESC", "-w", str(tmp_path)])
     assert result.exit_code == 0, result.output
     lines = [ln for ln in result.stdout.splitlines() if ln.strip()]
-    # priority 3, then ties at 1 broken stably by packet id order
     assert lines == ["tasks/a.md", "tasks/b.md", "tasks/c.md"]
 
 
 def test_query_order_by_asc(tmp_path: Path):
     _write_ws(tmp_path)
     runner = CliRunner()
-    result = runner.invoke(app, ["query", str(tmp_path), "* ORDER BY priority"])
+    result = runner.invoke(app, ["query", "* ORDER BY priority", "-w", str(tmp_path)])
     assert result.exit_code == 0, result.output
     lines = [ln for ln in result.stdout.splitlines() if ln.strip()]
-    # priorities [3, 1, 1] → ascending: two 1s first (stable by id), then 3
     assert lines == ["tasks/b.md", "tasks/c.md", "tasks/a.md"]
 
 
@@ -87,9 +97,6 @@ def test_version_cmd():
     result = runner.invoke(app, ["version"])
     assert result.exit_code == 0
     assert result.stdout.strip() == pkg_version("fmql")
-
-
-# ---- follow ----
 
 
 def _write_blocked_ws(root: Path) -> None:
@@ -107,8 +114,9 @@ def test_query_follow_depth_1(tmp_path: Path):
         app,
         [
             "query",
-            str(tmp_path),
             'uuid = "c"',
+            "-w",
+            str(tmp_path),
             "--follow",
             "blocked_by",
             "--depth",
@@ -129,8 +137,9 @@ def test_query_follow_depth_star(tmp_path: Path):
         app,
         [
             "query",
-            str(tmp_path),
             'uuid = "c"',
+            "-w",
+            str(tmp_path),
             "--follow",
             "blocked_by",
             "--depth",
@@ -151,8 +160,9 @@ def test_query_follow_reverse(tmp_path: Path):
         app,
         [
             "query",
-            str(tmp_path),
             'uuid = "a"',
+            "-w",
+            str(tmp_path),
             "--follow",
             "blocked_by",
             "--direction",
@@ -173,8 +183,9 @@ def test_query_follow_include_origin(tmp_path: Path):
         app,
         [
             "query",
-            str(tmp_path),
             'uuid = "c"',
+            "-w",
+            str(tmp_path),
             "--follow",
             "blocked_by",
             "--depth",
@@ -196,8 +207,9 @@ def test_query_follow_zero_results_emits_resolver_warning(tmp_path: Path):
         app,
         [
             "query",
-            str(tmp_path),
             'uuid = "c"',
+            "-w",
+            str(tmp_path),
             "--follow",
             "blocked_by",
             "--diagnose",
@@ -216,8 +228,9 @@ def test_query_follow_warning_suppressed_with_matching_resolver(tmp_path: Path):
         app,
         [
             "query",
-            str(tmp_path),
             'uuid = "c"',
+            "-w",
+            str(tmp_path),
             "--follow",
             "blocked_by",
             "--resolver",
@@ -236,8 +249,9 @@ def test_query_follow_warning_fires_even_with_empty_seeds(tmp_path: Path):
         app,
         [
             "query",
-            str(tmp_path),
             'uuid = "no-such-packet"',
+            "-w",
+            str(tmp_path),
             "--follow",
             "blocked_by",
             "--diagnose",
@@ -245,8 +259,6 @@ def test_query_follow_warning_fires_even_with_empty_seeds(tmp_path: Path):
     )
     assert result.exit_code == 0, result.output
     assert result.stdout.strip() == ""
-    # Warning reflects workspace state — bound resolver leaves blocked_by
-    # values unresolved across the workspace, regardless of seed selection.
     assert "warning:" in result.stderr
 
 
@@ -255,22 +267,22 @@ def test_query_without_follow_no_warning(tmp_path: Path):
     runner = CliRunner()
     result = runner.invoke(
         app,
-        ["query", str(tmp_path), 'uuid = "nope"', "--diagnose"],
+        ["query", 'uuid = "nope"', "-w", str(tmp_path), "--diagnose"],
     )
     assert result.exit_code == 0, result.output
     assert "warning:" not in result.stderr
 
 
 def test_query_follow_no_diagnose_flag_is_silent(tmp_path: Path):
-    """Default invocation (no --diagnose) must never emit warnings, even on misbinds."""
     _write_blocked_ws(tmp_path)
     runner = CliRunner()
     result = runner.invoke(
         app,
         [
             "query",
-            str(tmp_path),
             'uuid = "c"',
+            "-w",
+            str(tmp_path),
             "--follow",
             "blocked_by",
         ],
@@ -285,7 +297,7 @@ def test_query_diagnose_invalid_workspace_md_value_exits_2(tmp_path: Path):
     runner = CliRunner()
     result = runner.invoke(
         app,
-        ["query", str(tmp_path), 'uuid = "c"', "--follow", "blocked_by"],
+        ["query", 'uuid = "c"', "-w", str(tmp_path), "--follow", "blocked_by"],
     )
     assert result.exit_code == 2
     assert "diagnose" in result.stderr
@@ -299,8 +311,9 @@ def test_query_follow_diagnose_via_workspace_md(tmp_path: Path):
         app,
         [
             "query",
-            str(tmp_path),
             'uuid = "c"',
+            "-w",
+            str(tmp_path),
             "--follow",
             "blocked_by",
         ],
@@ -310,7 +323,6 @@ def test_query_follow_diagnose_via_workspace_md(tmp_path: Path):
 
 
 def test_query_follow_partial_mismatch_emits_warning(tmp_path: Path):
-    """A field where some values resolve and some don't should still warn."""
     root = tmp_path
     root.mkdir(parents=True, exist_ok=True)
     (root / "a.md").write_text("---\nuuid: a\n---\n", encoding="utf-8")
@@ -320,8 +332,9 @@ def test_query_follow_partial_mismatch_emits_warning(tmp_path: Path):
         app,
         [
             "query",
-            str(tmp_path),
             'uuid = "b"',
+            "-w",
+            str(tmp_path),
             "--follow",
             "blocked_by",
             "--resolver",
@@ -345,7 +358,7 @@ def test_query_workspace_md_id_resolver_end_to_end(tmp_path: Path):
     runner = CliRunner()
     result = runner.invoke(
         app,
-        ["query", str(tmp_path), "id = 2", "--follow", "depends_on", "--diagnose"],
+        ["query", "id = 2", "-w", str(tmp_path), "--follow", "depends_on", "--diagnose"],
     )
     assert result.exit_code == 0, result.output
     lines = [ln for ln in result.stdout.splitlines() if ln.strip()]
@@ -366,8 +379,9 @@ def test_query_cli_resolver_overrides_workspace_md_binding(tmp_path: Path):
         app,
         [
             "query",
-            str(tmp_path),
             'uuid = "b"',
+            "-w",
+            str(tmp_path),
             "--follow",
             "depends_on",
             "--resolver",
@@ -386,8 +400,9 @@ def test_query_follow_invalid_depth(tmp_path: Path):
         app,
         [
             "query",
-            str(tmp_path),
             'uuid = "c"',
+            "-w",
+            str(tmp_path),
             "--follow",
             "blocked_by",
             "--depth",
@@ -406,7 +421,7 @@ def test_query_search_narrows(tmp_path: Path):
         encoding="utf-8",
     )
     runner = CliRunner()
-    result = runner.invoke(app, ["query", str(tmp_path), "*", "--search", "banana"])
+    result = runner.invoke(app, ["query", "*", "-w", str(tmp_path), "--search", "banana"])
     assert result.exit_code == 0, result.output
     lines = [ln for ln in result.stdout.splitlines() if ln.strip()]
     assert lines == ["tasks/a.md"]
@@ -421,7 +436,7 @@ def test_query_search_explicit_grep_index(tmp_path: Path):
     runner = CliRunner()
     result = runner.invoke(
         app,
-        ["query", str(tmp_path), "*", "--search", "banana", "--index", "grep"],
+        ["query", "*", "-w", str(tmp_path), "--search", "banana", "--index", "grep"],
     )
     assert result.exit_code == 0, result.output
     lines = [ln for ln in result.stdout.splitlines() if ln.strip()]
@@ -433,7 +448,7 @@ def test_query_unknown_index_exits_2(tmp_path: Path):
     runner = CliRunner()
     result = runner.invoke(
         app,
-        ["query", str(tmp_path), "*", "--search", "foo", "--index", "nope"],
+        ["query", "*", "-w", str(tmp_path), "--search", "foo", "--index", "nope"],
     )
     assert result.exit_code == 2
 
@@ -453,8 +468,9 @@ def test_query_search_combines_with_filter(tmp_path: Path):
         app,
         [
             "query",
-            str(tmp_path),
             "priority > 2",
+            "-w",
+            str(tmp_path),
             "--search",
             "banana",
         ],
@@ -462,44 +478,3 @@ def test_query_search_combines_with_filter(tmp_path: Path):
     assert result.exit_code == 0, result.output
     lines = [ln for ln in result.stdout.splitlines() if ln.strip()]
     assert lines == ["tasks/a.md"]
-
-
-def test_query_follow_pipe_to_append(tmp_path: Path):
-    _write_blocked_ws(tmp_path)
-    runner = CliRunner()
-    # 1) query yields paths.
-    q_result = runner.invoke(
-        app,
-        [
-            "query",
-            str(tmp_path),
-            'uuid = "c"',
-            "--follow",
-            "blocked_by",
-            "--depth",
-            "*",
-            "--resolver",
-            "uuid",
-            "--include-origin",
-        ],
-    )
-    assert q_result.exit_code == 0, q_result.output
-    assert q_result.stdout.strip()
-
-    # 2) pipe them into append --dry-run with --workspace.
-    pipe_result = runner.invoke(
-        app,
-        [
-            "append",
-            "-",
-            "tags=blocked-chain",
-            "--workspace",
-            str(tmp_path),
-            "--dry-run",
-        ],
-        input=q_result.stdout,
-    )
-    assert pipe_result.exit_code == 0, pipe_result.output
-    # Dry-run: files on disk unchanged.
-    for name in ("a.md", "b.md", "c.md"):
-        assert "blocked-chain" not in (tmp_path / name).read_text()

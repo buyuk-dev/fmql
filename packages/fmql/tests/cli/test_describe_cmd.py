@@ -25,7 +25,7 @@ def _write_ws(root: Path) -> None:
 def test_describe_text_default(tmp_path: Path):
     _write_ws(tmp_path)
     runner = CliRunner()
-    result = runner.invoke(app, ["describe", str(tmp_path)])
+    result = runner.invoke(app, ["describe", "-w", str(tmp_path)])
     assert result.exit_code == 0, result.output
     assert "packets: 3" in result.stdout
     assert "no-frontmatter: 0" in result.stdout
@@ -33,10 +33,19 @@ def test_describe_text_default(tmp_path: Path):
     assert "priority" in result.stdout
 
 
+def test_describe_defaults_workspace_to_cwd(tmp_path: Path, monkeypatch):
+    _write_ws(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(app, ["describe"])
+    assert result.exit_code == 0, result.output
+    assert "packets: 3" in result.stdout
+
+
 def test_describe_json_format(tmp_path: Path):
     _write_ws(tmp_path)
     runner = CliRunner()
-    result = runner.invoke(app, ["describe", str(tmp_path), "--format", "json"])
+    result = runner.invoke(app, ["describe", "-w", str(tmp_path), "--format", "json"])
     assert result.exit_code == 0, result.output
     payload = json.loads(result.stdout)
     assert payload["packet_count"] == 3
@@ -48,7 +57,7 @@ def test_describe_json_format(tmp_path: Path):
 def test_describe_top_n(tmp_path: Path):
     _write_ws(tmp_path)
     runner = CliRunner()
-    result = runner.invoke(app, ["describe", str(tmp_path), "--format", "json", "--top", "1"])
+    result = runner.invoke(app, ["describe", "-w", str(tmp_path), "--format", "json", "--top", "1"])
     assert result.exit_code == 0, result.output
     payload = json.loads(result.stdout)
     status = next(f for f in payload["fields"] if f["name"] == "status")
@@ -58,5 +67,5 @@ def test_describe_top_n(tmp_path: Path):
 
 def test_describe_invalid_path(tmp_path: Path):
     runner = CliRunner()
-    result = runner.invoke(app, ["describe", str(tmp_path / "nope")])
+    result = runner.invoke(app, ["describe", "-w", str(tmp_path / "nope")])
     assert result.exit_code != 0
