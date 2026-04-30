@@ -2,9 +2,9 @@
 id: 0015
 title: Pseudo-fields `a._id` / `a._path` in Cypher `WHERE`
 status: todo
-priority: P2
+priority: P1
 created: 2026-04-19
-updated: 2026-04-19
+updated: '2026-04-30'
 tags: [cypher, query, frontmatter]
 depends_on: []
 github_issue: https://github.com/buyuk-dev/fmql/issues/8
