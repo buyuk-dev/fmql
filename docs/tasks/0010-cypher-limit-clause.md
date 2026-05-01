@@ -2,11 +2,12 @@
 id: 0010
 title: Cypher LIMIT N clause and `--limit` flag on fmql query
 status: todo
-priority: P3
+priority: 2
 created: 2026-04-29
 updated: 2026-04-29
 tags: [cypher, qlang, cli, query]
 depends_on: []
+phase: later
 ---
 
 ## Goal

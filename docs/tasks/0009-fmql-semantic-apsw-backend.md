@@ -2,11 +2,12 @@
 id: 0009
 title: fmql-semantic — switch to apsw to drop the loadable-extension sqlite3 install requirement
 status: todo
-priority: P2
+priority: 2
 created: 2026-04-29
 updated: 2026-04-29
 tags: [fmql-semantic, install, sqlite, packaging]
 depends_on: []
+phase: later
 ---
 
 ## Goal

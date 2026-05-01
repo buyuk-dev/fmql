@@ -2,11 +2,12 @@
 id: 0022
 title: Resolve Cypher-compatibility divergences (`+=` semantics, function-name collisions)
 status: todo
-priority: P3
+priority: 2
 created: 2026-04-30
 updated: 2026-04-30
 tags: [cypher, language, compatibility, footgun]
 depends_on: [0021]
+phase: later
 ---
 
 ## Goal

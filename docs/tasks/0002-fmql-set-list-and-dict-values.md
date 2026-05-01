@@ -2,7 +2,7 @@
 id: 0002
 title: fmql set / append support for list and dict values
 status: done
-priority: P1
+priority: 1
 created: 2026-04-19
 updated: 2026-04-28
 tags: [cli, edits, frontmatter]

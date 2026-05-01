@@ -2,11 +2,12 @@
 id: 0005
 title: Disambiguate `--format json` between NDJSON and JSON-array output
 status: todo
-priority: P2
+priority: 3
 created: 2026-04-19
 updated: 2026-04-29
 tags: [cli, output, ux, docs]
 depends_on: []
+phase: later
 ---
 
 ## Goal

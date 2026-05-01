@@ -2,12 +2,13 @@
 id: 0013
 title: Auto-doctor edge references when files move or are deleted
 status: todo
-priority: P3
+priority: 3
 created: 2026-04-19
 updated: 2026-04-29
 tags: [wishlist, edges, resolver, filesystem, integrity]
 depends_on:
   - 0012-filesystem-level-operations
+phase: wishlist
 ---
 
 ## Goal

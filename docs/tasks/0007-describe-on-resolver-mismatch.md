@@ -2,12 +2,13 @@
 id: 0007
 title: Surface `fmql describe` output on resolver mismatch
 status: todo
-priority: P1
+priority: 2
 created: 2026-04-19
 updated: '2026-04-30'
 tags: [cli, ux, resolver, describe]
 depends_on:
   - 0001-id-resolver-for-edge-fields
+phase: now
 ---
 
 ## Goal

@@ -2,7 +2,7 @@
 id: 0001
 title: ID resolver for edge fields, with type-aware mismatch warnings
 status: done
-priority: P1
+priority: 1
 created: 2026-04-19
 updated: 2026-04-27
 tags: [resolver, edges, ux]

@@ -2,7 +2,7 @@
 id: 0003
 title: Bulk-migration command — symmetric edit path for Cypher
 status: done
-priority: P1
+priority: 1
 created: 2026-04-19
 updated: 2026-04-28
 tags: [cli, cypher, edits, migrations]

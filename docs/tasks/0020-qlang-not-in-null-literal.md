@@ -1,12 +1,13 @@
 ---
 id: 0020
-title: `NOT IN`, `null` literal, and `IS NOT NULL` in qlang and Cypher WHERE
+title: "`NOT IN`, `null` literal, and `IS NOT NULL` in qlang and Cypher WHERE"
 status: todo
-priority: P2
+priority: 1
 created: 2026-04-30
 updated: 2026-04-30
 tags: [qlang, cypher, grammar, ux]
 depends_on: []
+phase: next
 ---
 
 ## Goal

@@ -2,11 +2,12 @@
 id: 0018
 title: Mermaid output format for `fmql subgraph`
 status: todo
-priority: P2
+priority: 2
 created: 2026-04-30
 updated: 2026-04-30
 tags: [cli, subgraph, output, visualization]
 depends_on: []
+phase: later
 ---
 
 ## Goal

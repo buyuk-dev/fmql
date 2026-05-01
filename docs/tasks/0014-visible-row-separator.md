@@ -2,12 +2,13 @@
 id: 0014
 title: Visible row separator in `rows` output format
 status: todo
-priority: P3
+priority: 2
 created: 2026-04-19
 updated: 2026-04-19
 tags: [cli, output, ux]
 depends_on: []
 github_issue: https://github.com/buyuk-dev/fmql/issues/7
+phase: wishlist
 ---
 
 ## Goal

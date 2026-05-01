@@ -2,11 +2,12 @@
 id: 0019
 title: Project website hosted on GitHub Pages
 status: todo
-priority: P3
+priority: 3
 created: 2026-04-30
 updated: 2026-04-30
 tags: [docs, website, marketing, infra]
 depends_on: []
+phase: later
 ---
 
 ## Goal

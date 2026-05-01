@@ -2,11 +2,12 @@
 id: 0021
 title: Deprecate qlang; rename `fmql cypher` to `fmql query`; build sugar inside Cypher
 status: todo
-priority: P1
+priority: 1
 created: 2026-04-30
 updated: 2026-04-30
 tags: [qlang, cypher, cli, language, breaking-change]
 depends_on: []
+phase: now
 ---
 
 ## Goal

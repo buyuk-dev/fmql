@@ -2,7 +2,7 @@
 id: 0004
 title: Unify workspace / target handling across CLI commands
 status: done
-priority: P2
+priority: 2
 created: 2026-04-19
 updated: 2026-04-28
 tags: [cli, ux, workspace]
