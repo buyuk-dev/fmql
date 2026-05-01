@@ -2,11 +2,12 @@
 id: 0004
 title: Unify workspace / target handling across CLI commands
 status: done
-priority: 2
+priority: 1
 created: 2026-04-19
 updated: 2026-04-28
 tags: [cli, ux, workspace]
 depends_on: []
+phase: workspace
 ---
 
 ## Goal

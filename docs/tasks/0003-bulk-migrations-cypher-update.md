@@ -8,6 +8,7 @@ updated: 2026-04-28
 tags: [cli, cypher, edits, migrations]
 depends_on:
   - 0002-fmql-set-list-and-dict-values
+phase: cypher
 ---
 
 ## Goal

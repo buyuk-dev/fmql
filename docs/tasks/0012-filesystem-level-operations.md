@@ -2,13 +2,13 @@
 id: 0012
 title: Filesystem-level operations (ls, mv, cp, rm, stat) over the workspace
 status: todo
-priority: 3
+priority: 2
 created: 2026-04-19
 updated: 2026-04-29
 tags: [wishlist, cli, filesystem, edits]
 depends_on:
   - 0008-workspace-relative-paths-everywhere
-phase: later
+phase: workspace
 ---
 
 ## Goal

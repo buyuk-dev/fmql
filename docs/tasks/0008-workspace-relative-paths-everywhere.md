@@ -2,13 +2,13 @@
 id: 0008
 title: Make every CLI path workspace-relative — args, stdin, outputs
 status: todo
-priority: 3
+priority: 1
 created: 2026-04-29
 updated: 2026-04-29
 tags: [cli, ux, workspace]
 depends_on:
   - 0004-workspace-target-ergonomics
-phase: next
+phase: workspace
 ---
 
 ## Goal

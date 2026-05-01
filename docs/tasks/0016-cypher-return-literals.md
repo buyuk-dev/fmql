@@ -8,7 +8,7 @@ updated: 2026-04-19
 tags: [cypher, query]
 depends_on: []
 github_issue: https://github.com/buyuk-dev/fmql/issues/9
-phase: later
+phase: cypher
 ---
 
 ## Goal

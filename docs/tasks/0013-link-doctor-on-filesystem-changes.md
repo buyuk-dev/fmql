@@ -8,7 +8,7 @@ updated: 2026-04-29
 tags: [wishlist, edges, resolver, filesystem, integrity]
 depends_on:
   - 0012-filesystem-level-operations
-phase: wishlist
+phase: workspace
 ---
 
 ## Goal

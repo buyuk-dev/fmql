@@ -2,11 +2,12 @@
 id: 0006
 title: Address the SQL-vs-qlang mental-model mismatch in docs
 status: done
-priority: 2
+priority: 3
 created: 2026-04-19
 updated: 2026-04-29
 tags: [docs, qlang, ux]
 depends_on: []
+phase: cypher
 ---
 
 ## Goal

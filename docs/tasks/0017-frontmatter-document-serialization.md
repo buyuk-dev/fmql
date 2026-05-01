@@ -8,7 +8,7 @@ updated: 2026-04-19
 tags: [cli, frontmatter, serialization, interop]
 depends_on: []
 github_issue: https://github.com/buyuk-dev/fmql/issues/10
-phase: later
+phase: cli
 ---
 
 ## Goal

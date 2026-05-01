@@ -8,7 +8,7 @@ updated: '2026-04-30'
 tags: [cypher, query, frontmatter]
 depends_on: []
 github_issue: https://github.com/buyuk-dev/fmql/issues/8
-phase: next
+phase: cypher
 ---
 
 ## Goal

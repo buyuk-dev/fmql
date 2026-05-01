@@ -2,12 +2,12 @@
 id: 0020
 title: "`NOT IN`, `null` literal, and `IS NOT NULL` in qlang and Cypher WHERE"
 status: todo
-priority: 1
+priority: 2
 created: 2026-04-30
 updated: 2026-04-30
 tags: [qlang, cypher, grammar, ux]
 depends_on: []
-phase: next
+phase: cypher
 ---
 
 ## Goal

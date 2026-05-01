@@ -7,6 +7,7 @@ created: 2026-04-19
 updated: 2026-04-27
 tags: [resolver, edges, ux]
 depends_on: []
+phase: resolvers
 ---
 
 ## Goal

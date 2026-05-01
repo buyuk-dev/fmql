@@ -7,7 +7,7 @@ created: 2026-04-30
 updated: 2026-04-30
 tags: [cli, subgraph, output, visualization]
 depends_on: []
-phase: later
+phase: cli
 ---
 
 ## Goal

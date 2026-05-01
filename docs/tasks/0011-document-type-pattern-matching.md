@@ -2,12 +2,12 @@
 id: 0011
 title: Pattern-match document type from frontmatter structure
 status: todo
-priority: 1
+priority: 3
 created: 2026-04-19
 updated: 2026-04-29
 tags: [wishlist, schema, frontmatter, describe]
 depends_on: []
-phase: wishlist
+phase: resolvers
 ---
 
 ## Goal

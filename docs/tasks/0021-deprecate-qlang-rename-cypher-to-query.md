@@ -7,7 +7,7 @@ created: 2026-04-30
 updated: 2026-04-30
 tags: [qlang, cypher, cli, language, breaking-change]
 depends_on: []
-phase: now
+phase: cypher
 ---
 
 ## Goal
