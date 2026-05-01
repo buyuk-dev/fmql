@@ -129,6 +129,17 @@ def project_pm_ws(make_workspace) -> Workspace:
 
 
 @pytest.fixture
+def null_partition_ws(make_workspace) -> Workspace:
+    return make_workspace(
+        {
+            "absent.md": {"frontmatter": {"uuid": "absent"}},
+            "explicit.md": {"frontmatter": {"uuid": "explicit", "blocked_by": None}},
+            "present.md": {"frontmatter": {"uuid": "present", "blocked_by": "x"}},
+        }
+    )
+
+
+@pytest.fixture
 def cycles_ws(make_workspace) -> Workspace:
     spec: dict[str, Any] = {
         "a.md": {

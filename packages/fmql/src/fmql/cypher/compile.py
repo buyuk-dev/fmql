@@ -378,6 +378,11 @@ class _Compiler(Transformer):
         values = [c for c in children[2:] if not _is_kw_token(c)]
         return PredNode(Predicate(field=str(qident), op="in", value=values))
 
+    def p_not_in(self, children):
+        qident = children[0]
+        values = [c for c in children[3:] if not _is_kw_token(c)]
+        return PredNode(Predicate(field=str(qident), op="not_in", value=values))
+
     @v_args(inline=True)
     def p_not_empty(self, qident, *_kws):
         return PredNode(Predicate(field=str(qident), op="not_empty", value=True))
@@ -389,6 +394,10 @@ class _Compiler(Transformer):
     @v_args(inline=True)
     def p_null(self, qident, *_kws):
         return PredNode(Predicate(field=str(qident), op="is_null", value=True))
+
+    @v_args(inline=True)
+    def p_not_null(self, qident, *_kws):
+        return NotNode(PredNode(Predicate(field=str(qident), op="is_null", value=True)))
 
     @v_args(inline=True)
     def v_string(self, tok):
@@ -405,6 +414,10 @@ class _Compiler(Transformer):
     @v_args(inline=True)
     def v_bool(self, tok):
         return str(tok).lower() == "true"
+
+    @v_args(inline=True)
+    def v_null(self, _tok):
+        return None
 
     @v_args(inline=True)
     def v_date_offset(self, tok):

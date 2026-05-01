@@ -65,8 +65,10 @@ return_item: COUNT_KW "(" IDENT ")"          -> r_count
 
 predicate: qualified_ident cmp_op value                              -> p_binop
          | qualified_ident IN_KW "[" [value ("," value)*] "]"        -> p_in
+         | qualified_ident NOT_KW IN_KW "[" [value ("," value)*] "]" -> p_not_in
          | qualified_ident IS_KW NOT_KW EMPTY_KW                     -> p_not_empty
          | qualified_ident IS_KW EMPTY_KW                            -> p_empty
+         | qualified_ident IS_KW NOT_KW NULL_KW                      -> p_not_null
          | qualified_ident IS_KW NULL_KW                             -> p_null
 
 qualified_ident: IDENT ("." IDENT)?
@@ -76,6 +78,7 @@ cmp_op: EQ | NEQ | GTE | LTE | GT | LT | CONTAINS_KW | MATCHES_KW
 value: ESCAPED_STRING   -> v_string
      | SIGNED_NUMBER    -> v_number
      | BOOL_KW          -> v_bool
+     | NULL_KW          -> v_null
      | DATE_OFFSET      -> v_date_offset
 
 MATCH_KW.5: "MATCH"i

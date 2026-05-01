@@ -1,7 +1,7 @@
 ---
 id: 0020
 title: "`NOT IN`, `null` literal, and `IS NOT NULL` in Cypher WHERE"
-status: todo
+status: done
 priority: 2
 created: 2026-04-30
 updated: 2026-05-01

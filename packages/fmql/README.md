@@ -136,21 +136,27 @@ Logical: `AND` / `OR` / `NOT` / `( ... )` (case-insensitive).
 
 ```
 = != <> > >= < <=
-CONTAINS      — substring match on strings/lists
-MATCHES       — regex match on strings
-IN [v1, v2]   — membership test
-IS EMPTY      — field missing or empty
+CONTAINS         — substring match on strings/lists
+MATCHES          — regex match on strings
+IN [v1, v2]      — membership test
+NOT IN [v1, v2]  — negated membership test
+IS EMPTY         — field missing or empty
 IS NOT EMPTY
 IS NULL
+IS NOT NULL
 ```
 
-Values: quoted strings (`"active"`), numbers (`42`, `3.14`), booleans (`true`, `false`), ISO dates (`2026-05-01`), and date sentinels with required offset (`today+0d`, `today-7d`, `now+1h`, `today+30d`).
+Values: quoted strings (`"active"`), numbers (`42`, `3.14`), booleans (`true`, `false`), `null`, ISO dates (`2026-05-01`), and date sentinels with required offset (`today+0d`, `today-7d`, `now+1h`, `today+30d`).
+
+`null` matches packets where the field is absent **or** explicitly set to YAML `null`/`~` — the same equivalence class as `IS NULL`. `t.f != null` and `t.f IS NOT NULL` are the inverse: they match only packets where the field is present and non-null. Inside `IN [...]` lists, `null` works the same way: `t.f IN [null, "x"]` matches packets where the field is absent, explicitly null, or equal to `"x"`.
 
 ```bash
 fmql query 'MATCH (t) WHERE t.status = "active" AND t.priority > 2 RETURN t' -w ./project
 fmql query 'MATCH (t) WHERE t.due_date < today+0d AND t.status != "done" RETURN t' -w ./project
 fmql query 'MATCH (t) WHERE t.tags CONTAINS "urgent" OR t.priority >= 3 RETURN t' -w ./project
 fmql query 'MATCH (t) WHERE t.status IN ["todo", "in_progress"] RETURN t' -w ./project
+fmql query 'MATCH (t) WHERE t.assigned_to NOT IN [null, "alice"] RETURN t' -w ./project
+fmql query 'MATCH (t) WHERE t.assigned_to IS NOT NULL RETURN t' -w ./project
 fmql query 'MATCH (t) WHERE NOT (t.assigned_to IS EMPTY) RETURN t' -w ./project
 fmql query 'MATCH (t) WHERE t.title MATCHES "^\\[WIP\\]" RETURN t' -w ./project
 fmql query 'MATCH (a)-[:blocked_by*]->(a) RETURN a' -w ./project

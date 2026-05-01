@@ -471,6 +471,141 @@ def test_exec_where_is_null_matches_absent_in_cypher(project_pm_ws):
     assert pids == expected
 
 
+def test_exec_where_is_not_null(project_pm_ws):
+    res = compile_cypher("MATCH (a) WHERE a.blocked_by IS NOT NULL RETURN a", project_pm_ws)
+    pids = {row[0] for row in res.rows}
+    assert pids == {"tasks/task-3.md", "tasks/task-4.md"}
+
+
+def test_exec_where_is_null_and_is_not_null_partition(project_pm_ws):
+    null_res = compile_cypher("MATCH (a) WHERE a.blocked_by IS NULL RETURN a", project_pm_ws)
+    not_null_res = compile_cypher(
+        "MATCH (a) WHERE a.blocked_by IS NOT NULL RETURN a", project_pm_ws
+    )
+    null_pids = {row[0] for row in null_res.rows}
+    not_null_pids = {row[0] for row in not_null_res.rows}
+    assert null_pids.isdisjoint(not_null_pids)
+    assert null_pids | not_null_pids == set(project_pm_ws.packets.keys())
+
+
+def test_exec_where_eq_null_matches_absent_or_explicit(null_partition_ws):
+    res = compile_cypher("MATCH (a) WHERE a.blocked_by = null RETURN a", null_partition_ws)
+    pids = {row[0] for row in res.rows}
+    assert pids == {"absent.md", "explicit.md"}
+
+
+def test_exec_where_ne_null_matches_present_non_null(null_partition_ws):
+    res = compile_cypher("MATCH (a) WHERE a.blocked_by != null RETURN a", null_partition_ws)
+    pids = {row[0] for row in res.rows}
+    assert pids == {"present.md"}
+
+
+def test_exec_where_eq_null_and_ne_null_partition(null_partition_ws):
+    eq = compile_cypher("MATCH (a) WHERE a.blocked_by = null RETURN a", null_partition_ws)
+    ne = compile_cypher("MATCH (a) WHERE a.blocked_by != null RETURN a", null_partition_ws)
+    eq_pids = {row[0] for row in eq.rows}
+    ne_pids = {row[0] for row in ne.rows}
+    assert eq_pids.isdisjoint(ne_pids)
+    assert eq_pids | ne_pids == set(null_partition_ws.packets.keys())
+
+
+def test_exec_where_not_in_list(project_pm_ws):
+    res = compile_cypher(
+        'MATCH (a) WHERE a.status NOT IN ["active", "done"] RETURN a', project_pm_ws
+    )
+    in_res = compile_cypher(
+        'MATCH (a) WHERE a.status IN ["active", "done"] RETURN a', project_pm_ws
+    )
+    not_in_pids = {row[0] for row in res.rows}
+    in_pids = {row[0] for row in in_res.rows}
+    assert not_in_pids.isdisjoint(in_pids)
+    assert not_in_pids | in_pids == set(project_pm_ws.packets.keys())
+
+
+def test_exec_where_not_in_list_with_null(make_workspace):
+    ws = make_workspace(
+        {
+            "absent.md": {"frontmatter": {"uuid": "absent"}},
+            "explicit.md": {"frontmatter": {"uuid": "explicit", "status": None}},
+            "active.md": {"frontmatter": {"uuid": "active", "status": "active"}},
+            "other.md": {"frontmatter": {"uuid": "other", "status": "blocked"}},
+        }
+    )
+    res = compile_cypher('MATCH (a) WHERE a.status NOT IN [null, "active"] RETURN a', ws)
+    pids = {row[0] for row in res.rows}
+    assert pids == {"other.md"}
+
+
+def test_exec_where_in_list_only_null(make_workspace):
+    ws = make_workspace(
+        {
+            "absent.md": {"frontmatter": {"uuid": "absent"}},
+            "explicit.md": {"frontmatter": {"uuid": "explicit", "status": None}},
+            "active.md": {"frontmatter": {"uuid": "active", "status": "active"}},
+        }
+    )
+    res = compile_cypher("MATCH (a) WHERE a.status IN [null] RETURN a", ws)
+    pids = {row[0] for row in res.rows}
+    assert pids == {"absent.md", "explicit.md"}
+
+
+def test_exec_where_in_list_with_null_mixed(make_workspace):
+    ws = make_workspace(
+        {
+            "absent.md": {"frontmatter": {"uuid": "absent"}},
+            "explicit.md": {"frontmatter": {"uuid": "explicit", "status": None}},
+            "active.md": {"frontmatter": {"uuid": "active", "status": "active"}},
+            "done.md": {"frontmatter": {"uuid": "done", "status": "done"}},
+        }
+    )
+    res = compile_cypher('MATCH (a) WHERE a.status IN [null, "active"] RETURN a', ws)
+    pids = {row[0] for row in res.rows}
+    assert pids == {"absent.md", "explicit.md", "active.md"}
+
+
+@pytest.mark.parametrize(
+    "txt",
+    [
+        'MATCH (a) WHERE a.status NOT IN ["x"] RETURN a',
+        'MATCH (a) WHERE a.status NOT  IN ["x"] RETURN a',
+        'MATCH (a) WHERE a.status not in ["x"] RETURN a',
+        'MATCH (a) WHERE a.status Not In ["x"] RETURN a',
+        'MATCH (a) WHERE a.status NOT\tIN ["x"] RETURN a',
+    ],
+)
+def test_parse_not_in_whitespace_and_case(txt):
+    ast = parse_cypher(txt)
+    assert ast.where is not None
+
+
+@pytest.mark.parametrize(
+    "txt",
+    [
+        "MATCH (a) WHERE a.x IS NOT NULL RETURN a",
+        "MATCH (a) WHERE a.x IS  NOT  NULL RETURN a",
+        "MATCH (a) WHERE a.x is not null RETURN a",
+        "MATCH (a) WHERE a.x Is Not Null RETURN a",
+    ],
+)
+def test_parse_is_not_null_whitespace_and_case(txt):
+    ast = parse_cypher(txt)
+    assert ast.where is not None
+
+
+@pytest.mark.parametrize("token", ["null", "NULL", "Null", "nUlL"])
+def test_parse_null_literal_case_insensitive(token):
+    ast = parse_cypher(f"MATCH (a) WHERE a.x = {token} RETURN a")
+    assert ast.where is not None
+
+
+def test_exec_where_not_in_no_regression_with_paren_not(project_pm_ws):
+    paren = compile_cypher('MATCH (a) WHERE NOT (a.status IN ["active"]) RETURN a', project_pm_ws)
+    fused = compile_cypher('MATCH (a) WHERE a.status NOT IN ["active"] RETURN a', project_pm_ws)
+    paren_pids = {row[0] for row in paren.rows}
+    fused_pids = {row[0] for row in fused.rows}
+    assert paren_pids == fused_pids
+
+
 def test_exec_where_contains(project_pm_ws):
     res = compile_cypher('MATCH (a) WHERE a.tags CONTAINS "urgent" RETURN a', project_pm_ws)
     pids = {row[0] for row in res.rows}
