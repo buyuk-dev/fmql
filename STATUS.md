@@ -1,37 +1,35 @@
 ---
-session_id: aa5575b7-b768-4524-b41f-9854942b7214
-task_id: 10
-branch: feature/cypher-limit-clause
+session_id: dbff95e4-6319-45b8-b80b-ea131dcc5a1f
+task_id: 16
+branch: feature/cypher-return-literals
 phase: done
-started: '2026-05-01T21:22:49Z'
+started: '2026-05-01T21:47:51Z'
 ---
 # Status
 
-Task **0010 — Cypher `LIMIT N` clause and `--limit` flag on `fmql query`** finalized.
+Task **0016 — Allow string / number literals as `RETURN` items** finalized.
 
-Branch: `feature/cypher-limit-clause`. Plan: `~/.claude/plans/get-started-on-task-generic-gem.md`.
+Branch: `feature/cypher-return-literals`. Plan: `~/.claude/plans/get-started-on-task-lively-toucan.md`.
 
 ## Outcome
 
-- Grammar (`packages/fmql/src/fmql/cypher/grammar.lark`): new `LIMIT_KW.5` token and `limit_clause: LIMIT_KW INT` rule, slotted into the top-level cypher rule after `order_clause?`. `INT: /\d+/` admits no minus, so negative literals fail at parse time.
-- AST (`cypher/ast.py`): added `limit: Optional[int] = None` to `CypherAST`. No new dataclass — LIMIT is a single integer.
-- Compiler (`cypher/compile.py`): dropped the `(r"\bLIMIT\b", "LIMIT")` entry from `_UNSUPPORTED_KEYWORDS`; added a `limit_clause` transformer that returns `("__limit__", int(...))`; threaded the value through `_Compiler.cypher()` mirroring the `__order__` pattern.
-- Executor (`cypher/executor.py`): `_validate()` now rejects LIMIT without RETURN and negative limits (defensive — reachable only via hand-built ASTs). `compile_cypher_ast` short-circuits `LIMIT 0` via a new `_empty_result()` helper instead of running projection just to throw the rows away. `LIMIT N > 0` slices `result.rows` post-projection through a private `_apply_limit()` that also clears the `is_scalar`/`scalar` fields when an empty slice would otherwise leave a stale count behind.
-- CLI (`cli/cmd_query.py`): new `--limit N` option with Typer's `min=0` (replaces an earlier `parse_limit` helper that turned out to duplicate Typer's bound check). On the direct path, `--limit` is folded into `ast.limit` via `dataclasses.replace` before `compile_cypher_ast` runs — the executor sees a single value, no double-application. On the `--follow`/`--search` path, `itertools.islice(q, limit)` caps the post-traverse packet stream so graph traversal can short-circuit instead of materializing the full result.
-- Tests: 13 new LIMIT cases in `tests/test_cypher.py` (parse / executor / scalar count / SET-with-LIMIT) and 9 new CLI cases in `tests/cli/test_query_cmd.py` (in-query LIMIT, `--limit` flag, both directions of "more restrictive wins," `LIMIT 0`, negative-flag error, `--follow` integration, scalar count). The `LIMIT 10` line in `test_unsupported_constructs_raise` was replaced with `SKIP 5` to lock the deferred-keyword contract.
-- Docs: README's "Query syntax" block now documents `LIMIT N`; the Features bullet and Common-flags list mention it. ADR `docs/decisions/0006-limit-applies-to-return-projection.md` records the post-projection slicing decision and the `SET`/`REMOVE` interaction.
-- `/simplify` review pass: collapsed the CLI's two-slice composition into a single AST-level merge (removed `apply_limit` import from CLI, deleted the redundant `parse_limit` helper from `cli/_run.py`, made `_apply_limit` private to `executor.py`); added `LIMIT 0` short-circuit and `_apply_limit` early-return when `limit >= len(rows)`; switched the follow/search path to `itertools.islice` so traversal stops early; dropped two test comments that restated the test name or duplicated the ADR.
-- Workflow housekeeping: archived prior STATUS body to `docs/changelog/0003.md`; flipped task 0010 to `done`; updated `docs/roadmap.md`.
+- Grammar (`packages/fmql/src/fmql/cypher/grammar.lark`): two new `return_item` alternatives — `ESCAPED_STRING -> r_string` and `SIGNED_NUMBER -> r_number`. No new tokens; both lexemes were already imported for the `value` rule.
+- AST (`cypher/ast.py`): added `ReturnString(value, text)` and `ReturnNumber(value, text)` dataclasses; widened `ReturnItem` union accordingly. The `text` field carries the literal's source form so the executor can use it as the column name without re-quoting strings or normalizing number formats.
+- Compiler (`cypher/compile.py`): new `r_string` / `r_number` transformer methods; the int-vs-float dispatch (`"." in s or "e" in s or "E" in s`) was lifted into a module-level `_parse_number(text)` helper now shared by both `r_number` (new) and `v_number` (existing). The `return_clause` `isinstance` filter widened from three to five admitted types.
+- Executor (`cypher/executor.py`): `_validate` skips literal items in the `RETURN`-references-undeclared-variable check (literals have no `.var`); `_column_name` returns `r.text` for both literal types; `_project_item` returns `r.value` before any binding lookup so projection works on patterns where the literal's `.var`-less shape would otherwise crash.
+- Tests: 5 new cases in `packages/fmql/tests/test_cypher.py` — three parsing tests (string, number with int/float discrimination, mixed literals + property accesses) and two execution tests using the existing `project_pm_ws` fixture (string-as-middle-column shape, number literal preserves `int` type through projection).
+- Docs: README's cypher syntax block now shows `RETURN a.title, "|", b.title` and `RETURN a.title, 1` with a one-line note explaining the constant-column / source-form-name semantics. ADR `docs/decisions/0007-return-literal-column-naming.md` records the source-form column-name choice with rationale and rejected alternatives (unwrapped value, `col_N`, single `ReturnLiteral`, `AS` aliasing).
+- `/simplify` review pass: extracted the int-vs-float dispatch into the shared `_parse_number` helper (flagged by both reuse and quality reviewers as a divergence risk between `r_number` and `v_number`); dropped the misleading `value: Any` local annotation from `r_number`. Kept the `text` field on `ReturnString` / `ReturnNumber` (deriving it from `value` would lose source-form info — `repr("|")` produces `'|'`, `str(1e2)` produces `100.0`).
+- Workflow housekeeping: archived prior STATUS body to `docs/changelog/0004.md`; flipped task 0016 to `done`; updated `docs/roadmap.md`.
 
 ## Verification
 
 - `make format` — clean.
 - `make lint` — clean.
-- `make test` — `fmql` 531 passed, `fmql-semantic` 56 passed.
+- `make test` — `fmql` 536 passed (was 531; +5 new tests), `fmql-semantic` 56 passed.
 
 ## Notes
 
-- **SKIP deferred.** Task 0010 explicitly flagged the decision; SKIP stays in `_UNSUPPORTED_KEYWORDS` and gets its own follow-up. Reasoning recorded in the task file's Notes: SKIP needs a separate validation rule (must require ORDER BY for determinism), its own CLI ergonomics question (`--skip N`?), and its own SET/REMOVE behavior call.
-- **`MATCH (t) SET t.tag = 1 RETURN t LIMIT 1` tags every matching `t`** — `SET` sees all bindings; `LIMIT` only caps `RETURN` projection. Without `WITH` there's no clean way to scope writes by `LIMIT`. Documented in ADR 0006 and verified by `test_exec_limit_with_set_applies_writes_to_all`.
-- **`LIMIT` is a reserved word now.** Frontmatter fields named `limit` (any case) can no longer be referenced in Cypher — same constraint as the other Cypher keywords (RETURN, WHERE, etc.). Affected workspaces would need to rename the field.
-- The first lint-clean review attempt suggested using `_is_kw_token(c)` in `limit_clause`'s child filter; that helper actually returns True for *any* Token (not just keywords), which would skip the `INT` data token too. Reverted to `isinstance(c, Token) and c.type == "INT"` after the test failure surfaced the misnomer. Worth knowing for future grammar work.
+- **Source-form column names** are the result of an explicit ADR (`0007`). Strings get quoted column names (`"|"`), numbers get their literal form (`1`, `-3.14`). Duplicate literals produce duplicate column names, mirroring the existing `RETURN a.title, a.title` permissiveness.
+- **No `AS alias` support yet.** Cypher-spec column aliasing (`RETURN "|" AS sep`) is the long-term answer for clean column names but adds grammar / formatter questions out of scope for this task. Deferred.
+- **`ReturnString.value` and `.text` are intentionally redundant.** The redundancy stores parser state (`text`) alongside the parsed value; the alternative — recomputing one from the other — loses information for strings (re-quoting fails on escape chars) and numbers (Python normalizes `1e2` to `100.0`). Documented in ADR 0007.

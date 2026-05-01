@@ -18,6 +18,8 @@ from fmql.cypher.ast import (
     ReturnCount,
     ReturnField,
     ReturnItem,
+    ReturnNumber,
+    ReturnString,
     ReturnVar,
     SetItem,
     UnaryOp,
@@ -117,6 +119,8 @@ def _validate(ast: CypherAST) -> None:
         raise CypherError(f"LIMIT must be non-negative, got {ast.limit}")
     vars_declared = {n.var for n in ast.pattern.nodes}
     for item in ast.returns:
+        if isinstance(item, (ReturnString, ReturnNumber)):
+            continue
         if item.var not in vars_declared:
             raise CypherError(f"RETURN references undeclared variable {item.var!r}")
     if ast.where is not None:
@@ -418,10 +422,14 @@ def _column_name(r: ReturnItem) -> str:
         return f"{r.var}.{r.field}"
     if isinstance(r, ReturnCount):
         return f"count({r.var})"
+    if isinstance(r, (ReturnString, ReturnNumber)):
+        return r.text
     raise CypherError(f"unknown return item: {type(r).__name__}")
 
 
 def _project_item(item: ReturnItem, binding: Binding, workspace: Workspace) -> Any:
+    if isinstance(item, (ReturnString, ReturnNumber)):
+        return item.value
     pid = binding[item.var]
     if isinstance(item, ReturnVar):
         return pid

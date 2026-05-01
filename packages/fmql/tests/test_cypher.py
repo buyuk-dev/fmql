@@ -7,6 +7,8 @@ from fmql.cypher.ast import (
     NodePat,
     ReturnCount,
     ReturnField,
+    ReturnNumber,
+    ReturnString,
     ReturnVar,
 )
 from fmql.cypher.compile import parse_cypher
@@ -68,6 +70,31 @@ def test_parse_where_and_return_forms():
 def test_parse_count_return():
     ast = parse_cypher("MATCH (a)-[:f]->(b) RETURN count(a)")
     assert ast.returns == (ReturnCount("a"),)
+
+
+def test_parse_return_string_literal():
+    ast = parse_cypher('MATCH (a) RETURN "|"')
+    assert ast.returns == (ReturnString(value="|", text='"|"'),)
+
+
+def test_parse_return_number_literal():
+    ast = parse_cypher("MATCH (a) RETURN 1, -3.14")
+    assert ast.returns == (
+        ReturnNumber(value=1, text="1"),
+        ReturnNumber(value=-3.14, text="-3.14"),
+    )
+    assert isinstance(ast.returns[0].value, int)
+    assert isinstance(ast.returns[1].value, float)
+
+
+def test_parse_return_mixed_literals_and_fields():
+    ast = parse_cypher('MATCH (a)-[:f]->(b) RETURN a.uuid, "|", b.uuid, 1')
+    assert ast.returns == (
+        ReturnField("a", "uuid"),
+        ReturnString(value="|", text='"|"'),
+        ReturnField("b", "uuid"),
+        ReturnNumber(value=1, text="1"),
+    )
 
 
 def test_parse_keywords_are_case_insensitive():
@@ -263,6 +290,31 @@ def test_exec_return_field(project_pm_ws):
     rows = _set_rows(res)
     assert ("task-3",) in rows
     assert ("task-4",) in rows
+
+
+def test_exec_return_string_literal(project_pm_ws):
+    project_pm_ws.resolvers["blocked_by"] = UuidResolver()
+    res = compile_cypher(
+        'MATCH (a)-[:blocked_by]->(b) RETURN a.uuid, "|", b.uuid',
+        project_pm_ws,
+    )
+    assert res.columns == ("a.uuid", '"|"', "b.uuid")
+    assert all(row[1] == "|" for row in res.rows)
+    assert _set_rows(res) == {
+        ("task-3", "|", "task-1"),
+        ("task-4", "|", "task-1"),
+        ("task-4", "|", "task-2"),
+    }
+
+
+def test_exec_return_number_literal(project_pm_ws):
+    project_pm_ws.resolvers["blocked_by"] = UuidResolver()
+    res = compile_cypher(
+        "MATCH (a)-[:blocked_by]->(b) RETURN a.uuid, 1",
+        project_pm_ws,
+    )
+    assert res.columns == ("a.uuid", "1")
+    assert all(row[1] == 1 and isinstance(row[1], int) for row in res.rows)
 
 
 def test_exec_count(blocked_ws):

@@ -1,10 +1,10 @@
 ---
 id: 0016
 title: Allow string / number literals as `RETURN` items
-status: todo
+status: done
 priority: 3
 created: 2026-04-19
-updated: 2026-04-19
+updated: 2026-05-01
 tags: [cypher, query]
 depends_on: []
 github_issue: https://github.com/buyuk-dev/fmql/issues/9

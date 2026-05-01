@@ -21,6 +21,8 @@ from fmql.cypher.ast import (
     ReturnCount,
     ReturnField,
     ReturnItem,
+    ReturnNumber,
+    ReturnString,
     ReturnVar,
     SetItem,
     UnaryOp,
@@ -194,7 +196,11 @@ class _Compiler(Transformer):
         return ("__where__", expr)
 
     def return_clause(self, children):
-        items = tuple(c for c in children if isinstance(c, (ReturnVar, ReturnField, ReturnCount)))
+        items = tuple(
+            c
+            for c in children
+            if isinstance(c, (ReturnVar, ReturnField, ReturnCount, ReturnString, ReturnNumber))
+        )
         if not items:
             raise CypherError("RETURN requires at least one item")
         return ("__return__", items)
@@ -349,6 +355,16 @@ class _Compiler(Transformer):
     def r_var(self, ident):
         return ReturnVar(var=str(ident))
 
+    @v_args(inline=True)
+    def r_string(self, tok):
+        text = str(tok)
+        return ReturnString(value=_unquote(text), text=text)
+
+    @v_args(inline=True)
+    def r_number(self, tok):
+        text = str(tok)
+        return ReturnNumber(value=_parse_number(text), text=text)
+
     def or_list(self, items):
         items = [i for i in items if not _is_kw_token(i)]
         if len(items) == 1:
@@ -413,10 +429,7 @@ class _Compiler(Transformer):
 
     @v_args(inline=True)
     def v_number(self, tok):
-        s = str(tok)
-        if "." in s or "e" in s or "E" in s:
-            return float(s)
-        return int(s)
+        return _parse_number(str(tok))
 
     @v_args(inline=True)
     def v_bool(self, tok):
@@ -429,6 +442,12 @@ class _Compiler(Transformer):
     @v_args(inline=True)
     def v_date_offset(self, tok):
         return resolve_sentinel(str(tok))
+
+
+def _parse_number(text: str) -> int | float:
+    if "." in text or "e" in text or "E" in text:
+        return float(text)
+    return int(text)
 
 
 def _to_value_expr(obj: Any) -> ValueExpr:

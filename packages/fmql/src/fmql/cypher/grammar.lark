@@ -54,6 +54,8 @@ limit_clause: LIMIT_KW INT
 return_item: COUNT_KW "(" IDENT ")"          -> r_count
            | IDENT "." IDENT                 -> r_field
            | IDENT                           -> r_var
+           | ESCAPED_STRING                  -> r_string
+           | SIGNED_NUMBER                   -> r_number
 
 ?or_expr: and_expr (OR_KW and_expr)+         -> or_list
         | and_expr

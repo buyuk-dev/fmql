@@ -42,7 +42,19 @@ class ReturnCount:
     var: str
 
 
-ReturnItem = Union[ReturnVar, ReturnField, ReturnCount]
+@dataclass(frozen=True)
+class ReturnString:
+    value: str
+    text: str
+
+
+@dataclass(frozen=True)
+class ReturnNumber:
+    value: Union[int, float]
+    text: str
+
+
+ReturnItem = Union[ReturnVar, ReturnField, ReturnCount, ReturnString, ReturnNumber]
 
 
 @dataclass(frozen=True)

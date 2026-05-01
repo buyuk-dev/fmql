@@ -124,6 +124,9 @@ REMOVE a.draft_notes
 RETURN a
 RETURN a, b
 RETURN a.title
+RETURN a.title, "|", b.title            # string and number literals project as
+RETURN a.title, 1                       # constant columns; column name is the
+                                        # literal source form ('"|"', '1', '-3.14')
 RETURN count(a)
 ORDER BY a.priority DESC [NULLS LAST]   # sort returned rows; keys may reference
                                         # any bound variable, not just RETURN items
@@ -131,6 +134,8 @@ LIMIT 10                                # cap returned rows; applies after ORDER
 ```
 
 Node labels parse but are ignored (schemaless). `ORDER BY` supports multiple comma-separated keys (`var` or `var.field`) with per-key `ASC`/`DESC` and optional `NULLS FIRST` / `NULLS LAST`; default nulls policy matches SQL (`ASC` → nulls last). `LIMIT N` requires a `RETURN`, takes a non-negative integer, and is applied after `ORDER BY` so it picks the top-N. `LIMIT 0` returns no rows; `SET`/`REMOVE` writes still apply to all matched bindings.
+
+`RETURN` items can be variable references (`a`), property accesses (`a.title`), `count(...)`, or string / number literals (`"|"`, `1`, `-3.14`). A literal projects as a constant column on every row — useful for separators, inline labels, or constant tags. The column name is the literal's source form, so duplicate literals produce duplicate column names just like duplicate property accesses do.
 
 ### `WHERE` operators
 
