@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Optional
 
 from fmql.cypher.ast import (
@@ -77,9 +77,27 @@ def compile_cypher_ast(ast: CypherAST, workspace: Workspace) -> CypherExecution:
 
     result: Optional[CypherResult] = None
     if ast.returns:
-        result = _project(ast.returns, bindings, workspace, sort_rows=not ast.order_by)
+        if ast.limit == 0:
+            result = _empty_result(ast.returns)
+        else:
+            result = _project(ast.returns, bindings, workspace, sort_rows=not ast.order_by)
+            if ast.limit is not None:
+                result = _apply_limit(result, ast.limit)
 
     return CypherExecution(plan=plan, result=result)
+
+
+def _apply_limit(result: CypherResult, limit: int) -> CypherResult:
+    if limit >= len(result.rows):
+        return result
+    new_rows = result.rows[:limit]
+    if result.is_scalar and not new_rows:
+        return replace(result, rows=new_rows, is_scalar=False, scalar=None)
+    return replace(result, rows=new_rows)
+
+
+def _empty_result(returns: tuple[ReturnItem, ...]) -> CypherResult:
+    return CypherResult(columns=tuple(_column_name(r) for r in returns), rows=())
 
 
 def _first_pid(binding: Binding) -> PacketId:
@@ -93,6 +111,10 @@ def _validate(ast: CypherAST) -> None:
         raise CypherError("query must contain at least one of SET, REMOVE, or RETURN")
     if ast.order_by and not ast.returns:
         raise CypherError("ORDER BY requires a RETURN clause")
+    if ast.limit is not None and not ast.returns:
+        raise CypherError("LIMIT requires a RETURN clause")
+    if ast.limit is not None and ast.limit < 0:
+        raise CypherError(f"LIMIT must be non-negative, got {ast.limit}")
     vars_declared = {n.var for n in ast.pattern.nodes}
     for item in ast.returns:
         if item.var not in vars_declared:

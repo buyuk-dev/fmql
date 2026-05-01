@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import itertools
 import json
+from dataclasses import replace
 from datetime import date, datetime
 from enum import Enum
 from pathlib import Path
@@ -48,7 +50,10 @@ def _is_single_packet_var(ast) -> bool:
 def query_cmd(
     query: str = typer.Argument(
         ...,
-        help="Cypher query (MATCH ... [WHERE ...] [SET|REMOVE ...] [RETURN ...] [ORDER BY ...]).",
+        help=(
+            "Cypher query "
+            "(MATCH ... [WHERE ...] [SET|REMOVE ...] [RETURN ...] [ORDER BY ...] [LIMIT N])."
+        ),
     ),
     workspace: Optional[Path] = typer.Option(
         None, "--workspace", "-w", help="Workspace root (default: cwd)."
@@ -90,6 +95,12 @@ def query_cmd(
         False, "--dry-run", help="With SET/REMOVE: preview changes without writing."
     ),
     yes: bool = typer.Option(False, "--yes", help="With SET/REMOVE: skip the confirmation prompt."),
+    limit: Optional[int] = typer.Option(
+        None,
+        "--limit",
+        min=0,
+        help="Cap output rows. With an in-query LIMIT, the more restrictive cap applies.",
+    ),
 ) -> int:
     default_r = resolver_by_name(resolver) if resolver else None
     ws_root = resolve_workspace(workspace)
@@ -97,6 +108,11 @@ def query_cmd(
     ast = parse_cypher(query)
 
     use_query_path = follow is not None or search is not None
+    if limit is not None and not use_query_path:
+        # Direct path: --limit caps the same row stream as in-query LIMIT;
+        # fold them into one cap and let the executor enforce it.
+        merged = limit if ast.limit is None else min(ast.limit, limit)
+        ast = replace(ast, limit=merged)
     single_var = _is_single_packet_var(ast)
     effective_fmt = (
         fmt if fmt is not None else (QueryFormat.paths if single_var else QueryFormat.rows)
@@ -130,7 +146,8 @@ def query_cmd(
                 resolver=follow_resolver,
                 include_origin=include_origin,
             )
-        _emit_packets(list(q), effective_fmt)
+        packets = list(itertools.islice(q, limit) if limit is not None else q)
+        _emit_packets(packets, effective_fmt)
         if follow is not None:
             maybe_emit_warnings(ws, [follow], diagnose=diagnose, resolver=follow_resolver)
         if ast.pattern.rels:

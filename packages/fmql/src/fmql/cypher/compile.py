@@ -57,7 +57,6 @@ _UNSUPPORTED_KEYWORDS: tuple[tuple[str, str], ...] = (
     (r"\bshortestPath\b", "shortestPath"),
     (r"\ballShortestPaths\b", "allShortestPaths"),
     (r"\bSKIP\b", "SKIP"),
-    (r"\bLIMIT\b", "LIMIT"),
     (r"\bUNION\b", "UNION"),
     (r"\bCALL\b", "CALL"),
 )
@@ -100,6 +99,7 @@ class _Compiler(Transformer):
         order_by: tuple[OrderKey, ...] = ()
         set_items: list[SetItem] = []
         remove_items: list[RemoveItem] = []
+        limit: Optional[int] = None
         for c in children[1:]:
             if isinstance(c, tuple) and c and c[0] == "__where__":
                 where = c[1]
@@ -107,6 +107,8 @@ class _Compiler(Transformer):
                 returns = c[1]
             elif isinstance(c, tuple) and c and c[0] == "__order__":
                 order_by = c[1]
+            elif isinstance(c, tuple) and c and c[0] == "__limit__":
+                limit = c[1]
             elif isinstance(c, tuple) and c and c[0] == "__set__":
                 set_items.extend(c[1])
             elif isinstance(c, tuple) and c and c[0] == "__remove__":
@@ -118,6 +120,7 @@ class _Compiler(Transformer):
             order_by=order_by,
             set_items=tuple(set_items),
             remove_items=tuple(remove_items),
+            limit=limit,
         )
 
     def edit_clause(self, children):
@@ -201,6 +204,10 @@ class _Compiler(Transformer):
         if not keys:
             raise CypherError("ORDER BY requires at least one key")
         return ("__order__", keys)
+
+    def limit_clause(self, children):
+        int_tok = next(c for c in children if isinstance(c, Token) and c.type == "INT")
+        return ("__limit__", int(str(int_tok)))
 
     def set_clause(self, children):
         items = tuple(c for c in children if isinstance(c, SetItem))

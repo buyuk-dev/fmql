@@ -88,7 +88,7 @@ def test_parse_keywords_are_case_insensitive():
         "MATCH (a)-[:f]->(b) WITH a RETURN a",
         "UNWIND [1,2] AS x RETURN x",
         "MATCH p = shortestPath((a)-[:f*]->(b)) RETURN p",
-        "MATCH (a) RETURN a LIMIT 10",
+        "MATCH (a) RETURN a SKIP 5",
         "MATCH (a) RETURN sum(a)",
         "MATCH (a) RETURN avg(a.x)",
     ],
@@ -424,6 +424,118 @@ def test_exec_order_by_unknown_field_keeps_all(make_workspace):
 def test_parse_order_by_invalid_direction_rejected():
     with pytest.raises(CypherError):
         parse_cypher("MATCH (a) RETURN a ORDER BY a.priority BOGUS")
+
+
+# ---------- LIMIT ----------
+
+
+def test_parse_limit_basic():
+    ast = parse_cypher("MATCH (a) RETURN a LIMIT 5")
+    assert ast.limit == 5
+
+
+def test_parse_limit_zero():
+    ast = parse_cypher("MATCH (a) RETURN a LIMIT 0")
+    assert ast.limit == 0
+
+
+def test_parse_limit_case_insensitive():
+    ast = parse_cypher("MATCH (a) RETURN a limit 3")
+    assert ast.limit == 3
+
+
+def test_parse_limit_with_order_by():
+    ast = parse_cypher("MATCH (a) RETURN a ORDER BY a.priority DESC LIMIT 2")
+    assert ast.limit == 2
+    assert len(ast.order_by) == 1
+
+
+def test_parse_limit_negative_grammar_rejects():
+    with pytest.raises(CypherError):
+        parse_cypher("MATCH (a) RETURN a LIMIT -5")
+
+
+def test_exec_limit_caps_rows(project_pm_ws):
+    full = compile_cypher("MATCH (a) RETURN a", project_pm_ws)
+    assert len(full.rows) > 2
+    res = compile_cypher("MATCH (a) RETURN a LIMIT 2", project_pm_ws)
+    assert len(res.rows) == 2
+
+
+def test_exec_limit_zero_returns_empty(project_pm_ws):
+    res = compile_cypher("MATCH (a) RETURN a LIMIT 0", project_pm_ws)
+    assert res.rows == ()
+
+
+def test_exec_limit_larger_than_result(project_pm_ws):
+    full = compile_cypher("MATCH (a) RETURN a", project_pm_ws)
+    res = compile_cypher("MATCH (a) RETURN a LIMIT 9999", project_pm_ws)
+    assert len(res.rows) == len(full.rows)
+
+
+def test_exec_limit_with_order_by_takes_top_n(project_pm_ws):
+    res = compile_cypher(
+        'MATCH (a) WHERE a.type = "task" RETURN a.uuid ORDER BY a.priority DESC LIMIT 2',
+        project_pm_ws,
+    )
+    uuids = [row[0] for row in res.rows]
+    assert uuids == ["task-3", "task-1"]
+
+
+def test_exec_limit_without_return_rejected(project_pm_ws):
+    from fmql.cypher.ast import CypherAST
+    from fmql.cypher.executor import compile_cypher_ast
+
+    ast = parse_cypher("MATCH (a) SET a.x = 1")
+    bad = CypherAST(pattern=ast.pattern, returns=(), set_items=ast.set_items, limit=5)
+    with pytest.raises(CypherError, match="LIMIT requires a RETURN clause"):
+        compile_cypher_ast(bad, project_pm_ws)
+
+
+def test_exec_limit_negative_rejected_at_validate(project_pm_ws):
+    from fmql.cypher.ast import CypherAST
+    from fmql.cypher.executor import compile_cypher_ast
+
+    ast = parse_cypher("MATCH (a) RETURN a")
+    bad = CypherAST(
+        pattern=ast.pattern,
+        returns=ast.returns,
+        limit=-1,
+    )
+    with pytest.raises(CypherError, match="LIMIT must be non-negative"):
+        compile_cypher_ast(bad, project_pm_ws)
+
+
+def test_exec_limit_count_keeps_scalar(project_pm_ws):
+    res = compile_cypher("MATCH (a) RETURN count(a) LIMIT 1", project_pm_ws)
+    assert res.is_scalar is True
+    assert len(res.rows) == 1
+    assert res.scalar == res.rows[0][0]
+
+
+def test_exec_limit_count_zero_clears_scalar(project_pm_ws):
+    res = compile_cypher("MATCH (a) RETURN count(a) LIMIT 0", project_pm_ws)
+    assert res.rows == ()
+    assert res.is_scalar is False
+    assert res.scalar is None
+
+
+def test_exec_limit_with_set_applies_writes_to_all(make_workspace):
+    ws = make_workspace(
+        {
+            "a.md": {"frontmatter": {"x": 1}},
+            "b.md": {"frontmatter": {"x": 2}},
+            "c.md": {"frontmatter": {"x": 3}},
+        }
+    )
+    from fmql.cypher.executor import compile_cypher_ast
+
+    ast = parse_cypher("MATCH (a) SET a.tag = 1 RETURN a LIMIT 1")
+    execution = compile_cypher_ast(ast, ws)
+    assert execution.plan is not None
+    assert len(execution.plan.ops) == 3  # all three packets get SET
+    assert execution.result is not None
+    assert len(execution.result.rows) == 1
 
 
 # ---------- WHERE operator coverage ----------

@@ -157,6 +157,139 @@ def test_query_count_return(tmp_path: Path):
     assert result.stdout.strip() == "3"
 
 
+def test_query_in_query_limit(tmp_path: Path):
+    _write_ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["query", "MATCH (t) RETURN t ORDER BY t.priority DESC LIMIT 2", "-w", str(tmp_path)],
+    )
+    assert result.exit_code == 0, result.output
+    lines = [ln for ln in result.stdout.splitlines() if ln.strip()]
+    assert lines == ["tasks/a.md", "tasks/b.md"]
+
+
+def test_query_limit_flag_caps_output(tmp_path: Path):
+    _write_ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["query", "MATCH (t) RETURN t ORDER BY t.priority", "-w", str(tmp_path), "--limit", "2"],
+    )
+    assert result.exit_code == 0, result.output
+    lines = [ln for ln in result.stdout.splitlines() if ln.strip()]
+    assert lines == ["tasks/b.md", "tasks/c.md"]
+
+
+def test_query_limit_flag_more_restrictive_than_query(tmp_path: Path):
+    _write_ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "query",
+            "MATCH (t) RETURN t ORDER BY t.priority LIMIT 5",
+            "-w",
+            str(tmp_path),
+            "--limit",
+            "1",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    lines = [ln for ln in result.stdout.splitlines() if ln.strip()]
+    assert lines == ["tasks/b.md"]
+
+
+def test_query_limit_in_query_more_restrictive_than_flag(tmp_path: Path):
+    _write_ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "query",
+            "MATCH (t) RETURN t ORDER BY t.priority LIMIT 1",
+            "-w",
+            str(tmp_path),
+            "--limit",
+            "5",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    lines = [ln for ln in result.stdout.splitlines() if ln.strip()]
+    assert lines == ["tasks/b.md"]
+
+
+def test_query_limit_zero_emits_nothing(tmp_path: Path):
+    _write_ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["query", "MATCH (t) RETURN t LIMIT 0", "-w", str(tmp_path)],
+    )
+    assert result.exit_code == 0, result.output
+    assert result.stdout.strip() == ""
+
+
+def test_query_limit_flag_negative_errors(tmp_path: Path):
+    _write_ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["query", "MATCH (t) RETURN t", "-w", str(tmp_path), "--limit=-1"],
+    )
+    assert result.exit_code == 2
+    assert "limit" in result.stderr.lower()
+
+
+def test_query_limit_with_follow(tmp_path: Path):
+    root = tmp_path
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "a.md").write_text("---\nuuid: a\nblocked_by: [b, c]\n---\n", encoding="utf-8")
+    (root / "b.md").write_text("---\nuuid: b\n---\n", encoding="utf-8")
+    (root / "c.md").write_text("---\nuuid: c\n---\n", encoding="utf-8")
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "query",
+            'MATCH (t) WHERE t.uuid = "a" RETURN t',
+            "-w",
+            str(tmp_path),
+            "--follow",
+            "blocked_by",
+            "--resolver",
+            "uuid",
+            "--limit",
+            "1",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    lines = [ln for ln in result.stdout.splitlines() if ln.strip()]
+    assert len(lines) == 1
+
+
+def test_query_limit_count_keeps_scalar(tmp_path: Path):
+    _write_ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["query", "MATCH (t) RETURN count(t) LIMIT 1", "-w", str(tmp_path)],
+    )
+    assert result.exit_code == 0, result.output
+    assert result.stdout.strip() == "3"
+
+
+def test_query_limit_count_zero_emits_nothing(tmp_path: Path):
+    _write_ws(tmp_path)
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["query", "MATCH (t) RETURN count(t) LIMIT 0", "-w", str(tmp_path)],
+    )
+    assert result.exit_code == 0, result.output
+    assert result.stdout.strip() == ""
+
+
 def test_version_cmd():
     from importlib.metadata import version as pkg_version
 

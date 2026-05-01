@@ -1,6 +1,6 @@
 ?start: cypher
 
-cypher: match_clause where_clause? edit_clause* return_clause? order_clause?
+cypher: match_clause where_clause? edit_clause* return_clause? order_clause? limit_clause?
 
 match_clause: MATCH_KW pattern
 
@@ -49,6 +49,8 @@ direction_kw: ASC_KW | DESC_KW
 nulls_spec: NULLS_KW FIRST_KW
           | NULLS_KW LAST_KW
 
+limit_clause: LIMIT_KW INT
+
 return_item: COUNT_KW "(" IDENT ")"          -> r_count
            | IDENT "." IDENT                 -> r_field
            | IDENT                           -> r_var
@@ -94,6 +96,7 @@ DESC_KW.4: "DESC"i
 NULLS_KW.4: "NULLS"i
 FIRST_KW.3: "FIRST"i
 LAST_KW.3: "LAST"i
+LIMIT_KW.5: "LIMIT"i
 
 AND_KW.3: "AND"i
 OR_KW.3: "OR"i

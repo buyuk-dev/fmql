@@ -65,7 +65,7 @@ for packet in q:
 
 ## Features
 
-- **Cypher query language** — `MATCH ... [WHERE ...] [SET|REMOVE ...] [RETURN ...] [ORDER BY ...]`, with virtual properties (`t.path`, `t.filename`, `t.slug`), list comprehensions, `+=`, unary `NOT`, and built-in functions (`resolve`, `field`, `slug`, `id`, `uuid`, `path`).
+- **Cypher query language** — `MATCH ... [WHERE ...] [SET|REMOVE ...] [RETURN ...] [ORDER BY ...] [LIMIT N]`, with virtual properties (`t.path`, `t.filename`, `t.slug`), list comprehensions, `+=`, unary `NOT`, and built-in functions (`resolve`, `field`, `slug`, `id`, `uuid`, `path`).
 - **Python kwargs API** — Django-style `field__op=value` with a full operator registry. Builds `Predicate` nodes directly; doesn't go through the Cypher grammar.
 - **Bulk edits via Cypher** — `fmql update 'MATCH … [WHERE …] [SET …] [REMOVE …]'`. Every edit previews a unified diff and prompts before writing.
 - **Format-preserving YAML** — round-trip via `ruamel.yaml`; edits preserve comments, key order, and quoting of untouched fields.
@@ -103,6 +103,7 @@ Common flags:
 - `--resolver {path,uuid,slug,id}` — default reference resolver for traversal and relationship hops.
 - `--format {raw,cytoscape}` — output shape for `subgraph` (default `raw`).
 - `--search QUERY`, `--index NAME`, `--index-location LOCATION` — pluggable search stage on `query` (backend default: `grep`).
+- `--limit N` — on `query`: cap output rows. With an in-query `LIMIT`, the more restrictive cap wins.
 - `--diagnose` — on `query` and `subgraph`: emit stderr `warning:` lines for reference values the active resolver could not match. Off by default; costs one extra workspace scan per relationship field. Enable globally for a workspace via `fmql.diagnose: true` in `WORKSPACE.md`.
 - `--dry-run`, `--yes` — preview or auto-confirm on `query` / `update` when the query has a `SET` or `REMOVE`.
 
@@ -126,9 +127,10 @@ RETURN a.title
 RETURN count(a)
 ORDER BY a.priority DESC [NULLS LAST]   # sort returned rows; keys may reference
                                         # any bound variable, not just RETURN items
+LIMIT 10                                # cap returned rows; applies after ORDER BY
 ```
 
-Node labels parse but are ignored (schemaless). `ORDER BY` supports multiple comma-separated keys (`var` or `var.field`) with per-key `ASC`/`DESC` and optional `NULLS FIRST` / `NULLS LAST`; default nulls policy matches SQL (`ASC` → nulls last).
+Node labels parse but are ignored (schemaless). `ORDER BY` supports multiple comma-separated keys (`var` or `var.field`) with per-key `ASC`/`DESC` and optional `NULLS FIRST` / `NULLS LAST`; default nulls policy matches SQL (`ASC` → nulls last). `LIMIT N` requires a `RETURN`, takes a non-negative integer, and is applied after `ORDER BY` so it picks the top-N. `LIMIT 0` returns no rows; `SET`/`REMOVE` writes still apply to all matched bindings.
 
 ### `WHERE` operators
 

@@ -13,7 +13,7 @@ Last updated: 2026-05-01.
 | [0006](tasks/0006-sql-not-qlang-cheatsheet.md) | done | 3 | (Superseded by 0021) SQL-vs-qlang mental-model mismatch |
 | [0015](tasks/0015-cypher-pseudo-fields-id-path.md) | done | 2 | Pseudo-fields `a._id` / `a._path` in Cypher `WHERE` |
 | [0020](tasks/0020-qlang-not-in-null-literal.md) | done | 2 | `NOT IN`, `null` literal, `IS NOT NULL` in Cypher WHERE |
-| [0010](tasks/0010-cypher-limit-clause.md) | todo | 3 | Cypher `LIMIT N` clause and `--limit` flag |
+| [0010](tasks/0010-cypher-limit-clause.md) | done | 3 | Cypher `LIMIT N` clause and `--limit` flag |
 | [0016](tasks/0016-cypher-return-literals.md) | todo | 3 | Allow string / number literals as `RETURN` items |
 | [0022](tasks/0022-cypher-compatibility-divergences.md) | todo | 3 | Resolve Cypher-compatibility divergences |
 

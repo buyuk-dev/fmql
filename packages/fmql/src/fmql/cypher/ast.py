@@ -109,6 +109,7 @@ class CypherAST:
     order_by: tuple[OrderKey, ...] = ()
     set_items: tuple[SetItem, ...] = ()
     remove_items: tuple[RemoveItem, ...] = ()
+    limit: Optional[int] = None
 
 
 @dataclass(frozen=True)
