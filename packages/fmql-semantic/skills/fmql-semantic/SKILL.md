@@ -1,6 +1,6 @@
 ---
 name: fmql-semantic
-description: Use fmql-semantic when the user wants meaning-based / semantic / hybrid search over a directory of markdown or frontmatter notes — phrasings like "find docs about X concept", "what have I written on …", "semantic search my notes", "retrieve by topic", "RAG over my vault", or when plain grep will miss hits because the user's query wording differs from the documents' wording. Also triggers on "hybrid search", "BM25 plus embeddings", "index my notes vault", "embed my markdown", "rerank results", "dense retrieval", "cosine similarity search over markdown". This is the `semantic` search backend for fmql — it sits on top of fmql's core commands, so also load the fmql skill for anything involving the qlang filter DSL, frontmatter edits, or graph traversal.
+description: Use fmql-semantic when the user wants meaning-based / semantic / hybrid search over a directory of markdown or frontmatter notes — phrasings like "find docs about X concept", "what have I written on …", "semantic search my notes", "retrieve by topic", "RAG over my vault", or when plain grep will miss hits because the user's query wording differs from the documents' wording. Also triggers on "hybrid search", "BM25 plus embeddings", "index my notes vault", "embed my markdown", "rerank results", "dense retrieval", "cosine similarity search over markdown". This is the `semantic` search backend for fmql — it sits on top of fmql's core commands, so also load the fmql skill for anything involving the Cypher query language, frontmatter edits, or graph traversal.
 ---
 
 # fmql-semantic
@@ -68,7 +68,7 @@ Useful `fmql index` flags:
 |---|---|
 | `--backend semantic` | Required. |
 | `--out LOCATION` | Override index path. Default: `<workspace>/.fmql/semantic.db`. |
-| `--filter "qlang"` | Restrict indexing to packets matching a qlang filter (e.g. `--filter 'type = "note"'` skips tasks). |
+| `--filter "QUERY"` | Restrict indexing to packets matching a Cypher query (e.g. `--filter 'MATCH (t) WHERE t.type = "note" RETURN t'` skips tasks). |
 | `--field NAME` | Frontmatter field to prepend to the embedded text. Repeatable. Default: first of `title`/`summary`/`name` that exists, plus the body. |
 | `--force` | Full rebuild, ignoring incremental cache. |
 | `--model`, `--api-base`, `--api-key`, `--batch-size`, `--concurrency`, `--max-tokens` | Embedding-request knobs. |
@@ -117,17 +117,18 @@ emits one JSON line per hit: `{"id": "...", "score": 0.87, "snippet": "..."}`.
 
 | User intent | Use |
 |---|---|
-| Filter by frontmatter field (status, type, due_date, …) | `fmql query` with qlang — no index needed |
+| Filter by frontmatter field (status, type, due_date, …) | `fmql query` with Cypher (`MATCH (t) WHERE … RETURN t`) — no index needed |
 | Match an exact literal string in file bytes | `fmql search "…" --backend grep` |
 | "Find notes about X concept" (meaning-based) | semantic, hybrid (default) |
 | Query has rare/exact proper nouns, API names, error codes | semantic, consider `--sparse-only` if dense keeps drifting |
 | Want pure semantic similarity for clustering / nearest-neighbour intent | `--dense-only` |
 | Top-k precision matters (LLM context window is tight, every slot counts) | hybrid + `--rerank`, configure a reranker |
 
-Combine structured filter + semantic search in one pipeline via the core `fmql query` command — it accepts a `--search` stage on top of a qlang filter:
+Combine structured filter + semantic search in one pipeline via the core `fmql query` command — it accepts a `--search` stage on top of a Cypher MATCH:
 
 ```bash
-fmql query ./vault 'type = "note" AND tags CONTAINS "review"' \
+fmql query 'MATCH (t) WHERE t.type = "note" AND t.tags CONTAINS "review" RETURN t' \
+  -w ./vault \
   --search "migration strategy" --index semantic --index-location ./vault/.fmql/semantic.db
 ```
 
@@ -137,7 +138,7 @@ fmql query ./vault 'type = "note" AND tags CONTAINS "review"' \
 
 ```bash
 # Inspect semantically-matched notes that are also unreviewed
-fmql query 'reviewed != true' -w ./vault \
+fmql query 'MATCH (t) WHERE t.reviewed != true RETURN t' -w ./vault \
   --search "migration strategy" --index semantic --index-location ./vault/.fmql/semantic.db
 ```
 
@@ -175,7 +176,7 @@ Query latency is dominated by the embedding API call (one per query unless `--sp
 
 ## Gotchas
 
-- **Frontmatter field *values* are not embedded.** Indexing writes "`<first configured field's value>\n\n<body>`" to both stores. Structured field values are already queryable via qlang, so embedding them would be redundant and noisy. If the user wants semantic search over titles only, point `--field` at just the title field and rely on short bodies — or pre-process.
+- **Frontmatter field *values* are not embedded.** Indexing writes "`<first configured field's value>\n\n<body>`" to both stores. Structured field values are already queryable via Cypher `WHERE`, so embedding them would be redundant and noisy. If the user wants semantic search over titles only, point `--field` at just the title field and rely on short bodies — or pre-process.
 - **Long packets get truncated.** Text exceeding `FMQL_EMBEDDING_MAX_TOKENS` (default 8000) is chopped from the end with one warning per build. For very long notes, consider splitting them before indexing.
 - **Model mismatch = rebuild.** Switching embedding models requires `--force` on `fmql index` and rebuilds from scratch. Agree on a model upfront.
 - **Index is a single SQLite file** (`<workspace>/.fmql/semantic.db`). Portable, easy to delete, but don't add it to git (it's big and user-specific — add `.fmql/` to `.gitignore`).
@@ -194,7 +195,8 @@ fmql search "quarterly planning" --backend semantic --workspace ./notes -k 10 --
 **"Find my recent review notes that mention 'migration strategy'."**
 
 ```bash
-fmql query ./notes 'type = "note" AND tags CONTAINS "review" AND created_at > today-30d' \
+fmql query 'MATCH (t) WHERE t.type = "note" AND t.tags CONTAINS "review" AND t.created_at > today-30d RETURN t' \
+  -w ./notes \
   --search "migration strategy" --index semantic
 ```
 

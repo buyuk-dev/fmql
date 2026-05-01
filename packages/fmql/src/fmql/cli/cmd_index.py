@@ -14,7 +14,7 @@ from fmql.cli._coerce import coerce_value
 from fmql.cli._run import resolve_workspace
 from fmql.errors import FmqlError
 from fmql.packet import Packet
-from fmql.qlang import compile_query
+from fmql.query import Query
 from fmql.search import (
     BackendInfo,
     BackendKindError,
@@ -90,7 +90,9 @@ def index_cmd(
     ),
     out: Optional[str] = typer.Option(None, "--out", help="Index location (backend-defined)."),
     filter_query: Optional[str] = typer.Option(
-        None, "--filter", help="qlang expression restricting which packets are indexed."
+        None,
+        "--filter",
+        help="Cypher query (MATCH ... RETURN var) restricting which packets are indexed.",
     ),
     field: Optional[list[str]] = typer.Option(
         None, "--field", help="Field to embed. Repeatable. Backend-defined default."
@@ -120,8 +122,7 @@ def index_cmd(
         ws_root = resolve_workspace(workspace)
         ws = Workspace(ws_root)
         if filter_query is not None:
-            q = compile_query(filter_query, ws)
-            pids = set(q.ids())
+            pids = set(Query(ws).cypher(filter_query).ids())
             packets: list[Packet] = [ws.packets[pid] for pid in sorted(pids)]
         else:
             packets = [ws.packets[pid] for pid in sorted(ws.packets)]

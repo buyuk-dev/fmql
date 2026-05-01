@@ -9,7 +9,7 @@ from fmql.cli.main import app
 
 def test_query_w_missing_path_errors_cleanly(tmp_path: Path):
     runner = CliRunner()
-    result = runner.invoke(app, ["query", "*", "-w", str(tmp_path / "nope")])
+    result = runner.invoke(app, ["query", "MATCH (t) RETURN t", "-w", str(tmp_path / "nope")])
     assert result.exit_code == 2
     assert "workspace not found" in result.stderr or "workspace not found" in result.output
 
@@ -18,7 +18,7 @@ def test_query_w_file_errors_cleanly(tmp_path: Path):
     f = tmp_path / "x.md"
     f.write_text("---\n---\n", encoding="utf-8")
     runner = CliRunner()
-    result = runner.invoke(app, ["query", "*", "-w", str(f)])
+    result = runner.invoke(app, ["query", "MATCH (t) RETURN t", "-w", str(f)])
     assert result.exit_code == 2
     msg = result.stderr or result.output
     assert "expected directory" in msg or "got file" in msg
@@ -28,7 +28,7 @@ def test_query_w_omitted_uses_cwd(tmp_path: Path, monkeypatch):
     (tmp_path / "a.md").write_text("---\nstatus: todo\n---\n", encoding="utf-8")
     monkeypatch.chdir(tmp_path)
     runner = CliRunner()
-    result = runner.invoke(app, ["query", "*"])
+    result = runner.invoke(app, ["query", "MATCH (t) RETURN t"])
     assert result.exit_code == 0, result.output
     assert "a.md" in result.stdout
 

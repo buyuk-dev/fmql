@@ -380,3 +380,142 @@ def test_exec_order_by_unprojected_field(project_pm_ws):
     )
     # Just verifying it executes and returns all packets.
     assert len(res.rows) == len(project_pm_ws.packets)
+
+
+def test_exec_order_by_heterogeneous_types(make_workspace):
+    ws = make_workspace(
+        {
+            "a.md": {"frontmatter": {"k": 1}},
+            "b.md": {"frontmatter": {"k": "zebra"}},
+            "c.md": {"frontmatter": {"k": True}},
+            "d.md": {"frontmatter": {"k": 2}},
+        }
+    )
+    res = compile_cypher("MATCH (a) RETURN a ORDER BY a.k", ws)
+    assert len(res.rows) == 4
+
+
+def test_exec_order_by_date_field(make_workspace):
+    from datetime import date
+
+    ws = make_workspace(
+        {
+            "a.md": {"frontmatter": {"due": date(2026, 5, 10)}},
+            "b.md": {"frontmatter": {"due": date(2026, 4, 1)}},
+            "c.md": {"frontmatter": {"due": date(2026, 7, 15)}},
+        }
+    )
+    res = compile_cypher("MATCH (a) RETURN a ORDER BY a.due", ws)
+    values = [ws.packets[row[0]].as_plain()["due"] for row in res.rows]
+    assert values == [date(2026, 4, 1), date(2026, 5, 10), date(2026, 7, 15)]
+
+
+def test_exec_order_by_unknown_field_keeps_all(make_workspace):
+    ws = make_workspace(
+        {
+            "a.md": {"frontmatter": {"x": 1}},
+            "b.md": {"frontmatter": {"x": 2}},
+        }
+    )
+    res = compile_cypher("MATCH (a) RETURN a ORDER BY a.nonexistent", ws)
+    assert len(res.rows) == 2
+
+
+def test_parse_order_by_invalid_direction_rejected():
+    with pytest.raises(CypherError):
+        parse_cypher("MATCH (a) RETURN a ORDER BY a.priority BOGUS")
+
+
+# ---------- WHERE operator coverage ----------
+
+
+def test_exec_where_eq_string(project_pm_ws):
+    res = compile_cypher('MATCH (a) WHERE a.status = "active" RETURN a', project_pm_ws)
+    pids = {row[0] for row in res.rows}
+    expected = {
+        pid for pid, p in project_pm_ws.packets.items() if p.as_plain().get("status") == "active"
+    }
+    assert pids == expected
+
+
+def test_exec_where_in_list(project_pm_ws):
+    res = compile_cypher('MATCH (a) WHERE a.status IN ["active", "done"] RETURN a', project_pm_ws)
+    pids = {row[0] for row in res.rows}
+    expected = {
+        pid
+        for pid, p in project_pm_ws.packets.items()
+        if p.as_plain().get("status") in ("active", "done")
+    }
+    assert pids == expected
+
+
+def test_exec_where_is_empty(project_pm_ws):
+    res = compile_cypher("MATCH (a) WHERE a.blocked_by IS EMPTY RETURN a", project_pm_ws)
+    for row in res.rows:
+        plain = project_pm_ws.packets[row[0]].as_plain()
+        assert plain.get("blocked_by") in (None, "", [], {}) or "blocked_by" not in plain
+
+
+def test_exec_where_is_not_empty(project_pm_ws):
+    res = compile_cypher("MATCH (a) WHERE a.blocked_by IS NOT EMPTY RETURN a", project_pm_ws)
+    pids = {row[0] for row in res.rows}
+    assert pids == {"tasks/task-3.md", "tasks/task-4.md"}
+
+
+def test_exec_where_is_null_matches_absent_in_cypher(project_pm_ws):
+    res = compile_cypher("MATCH (a) WHERE a.blocked_by IS NULL RETURN a", project_pm_ws)
+    pids = {row[0] for row in res.rows}
+    expected = {
+        pid for pid, p in project_pm_ws.packets.items() if p.as_plain().get("blocked_by") is None
+    }
+    assert pids == expected
+
+
+def test_exec_where_contains(project_pm_ws):
+    res = compile_cypher('MATCH (a) WHERE a.tags CONTAINS "urgent" RETURN a', project_pm_ws)
+    pids = {row[0] for row in res.rows}
+    assert pids == {"tasks/task-3.md"}
+
+
+def test_exec_where_matches(project_pm_ws):
+    res = compile_cypher('MATCH (a) WHERE a.uuid MATCHES "^task-\\\\d+$" RETURN a', project_pm_ws)
+    pids = {row[0] for row in res.rows}
+    assert pids == {
+        "tasks/task-1.md",
+        "tasks/task-2.md",
+        "tasks/task-3.md",
+        "tasks/task-4.md",
+    }
+
+
+def test_exec_where_not(project_pm_ws):
+    res = compile_cypher('MATCH (a) WHERE NOT a.status = "done" RETURN a', project_pm_ws)
+    pids = {row[0] for row in res.rows}
+    expected = {
+        pid for pid, p in project_pm_ws.packets.items() if p.as_plain().get("status") != "done"
+    }
+    assert pids == expected
+
+
+def test_exec_where_keywords_case_insensitive(project_pm_ws):
+    upper = compile_cypher(
+        'MATCH (a) WHERE a.status = "active" AND a.priority > 2 RETURN a', project_pm_ws
+    )
+    lower = compile_cypher(
+        'MATCH (a) WHERE a.status = "active" and a.priority > 2 return a', project_pm_ws
+    )
+    assert _set_rows(upper) == _set_rows(lower)
+
+
+def test_exec_where_today_sentinel(project_pm_ws):
+    from datetime import date
+
+    res = compile_cypher("MATCH (a) WHERE a.due_date < today+0d RETURN a", project_pm_ws)
+    pids = {row[0] for row in res.rows}
+    today_d = date.today()
+    expected = {
+        pid
+        for pid, p in project_pm_ws.packets.items()
+        if isinstance(p.as_plain().get("due_date"), date) and p.as_plain().get("due_date") < today_d
+    }
+    assert pids == expected

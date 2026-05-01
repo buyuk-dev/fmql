@@ -24,3 +24,7 @@ The project's own `docs/README.md` (before the cleanup) had SQL-flavored example
 ## Notes
 
 Originally surfaced as feedback item #6. The core observation: even the project's own author reached for SQL when writing examples, so this is a strong drift signal worth taking seriously rather than dismissing as user error.
+
+### Superseded by 0021 (2026-05-01)
+
+Task [0021](0021-deprecate-qlang-rename-cypher-to-query.md) deletes qlang as a language entirely. The "SQL vs qlang" framing in this task is moot. If the underlying drift signal still bites in practice, revisit as "SQL vs Cypher" — but the cheatsheet hadn't been written yet, so there's nothing concrete to migrate; this task closes as `done` and 0021 supersedes it.

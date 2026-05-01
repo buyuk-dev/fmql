@@ -5,7 +5,7 @@ status: todo
 priority: 3
 created: 2026-04-29
 updated: 2026-04-29
-tags: [cypher, qlang, cli, query]
+tags: [cypher, cli, query]
 depends_on: []
 phase: cypher
 ---
@@ -18,7 +18,6 @@ Cap the number of returned results, as in SQL `LIMIT N` / Cypher `LIMIT N`. Toda
 
 - [ ] Remove `LIMIT` from the `_UNSUPPORTED_KEYWORDS` list in [compile.py](../../packages/fmql/src/fmql/cypher/compile.py).
 - [ ] Add `LIMIT <int>` to the Cypher grammar ([cypher/grammar.lark](../../packages/fmql/src/fmql/cypher/grammar.lark)), AST ([cypher/ast.py](../../packages/fmql/src/fmql/cypher/ast.py)), and executor — must compose with `WHERE` and `ORDER BY` (apply ordering first, then truncate).
-- [ ] Add the same construct to qlang's grammar and compiler so both surfaces have parity.
 - [ ] Add a `--limit N` flag to `fmql query` that applies after any in-query `LIMIT` (taking the more restrictive of the two if both are present).
 - [ ] `LIMIT 0` returns an empty result deterministically; negative values error.
 - [ ] Decision required: do we also support `SKIP N` for pagination? It's the natural pair, but currently also rejected as unsupported. Capture the answer in the task or split SKIP into a follow-up.

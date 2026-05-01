@@ -3,7 +3,6 @@ from __future__ import annotations
 import typer
 
 from fmql import __version__
-from fmql.cli.cmd_cypher import cypher_cmd
 from fmql.cli.cmd_describe import describe_cmd
 from fmql.cli.cmd_index import index_cmd, list_backends_cmd, search_cmd
 from fmql.cli.cmd_query import query_cmd
@@ -16,9 +15,8 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 
-app.command(name="query", help="Query a workspace of frontmatter files.")(query_cmd)
+app.command(name="query", help="Query a workspace of frontmatter files (Cypher subset).")(query_cmd)
 app.command(name="describe", help="Describe a workspace of frontmatter files.")(describe_cmd)
-app.command(name="cypher", help="Run a Cypher-subset pattern query.")(cypher_cmd)
 app.command(name="update", help="Pattern-match and edit packets (MATCH ... [SET|REMOVE]).")(
     update_cmd
 )

@@ -1,5 +1,24 @@
 # Changelog
 
+## [Unreleased]
+
+### Removed (BREAKING)
+
+- The qlang filter DSL is gone. The `fmql.qlang` module (`grammar.lark`, `compile.py`, `__init__.py`) is deleted. There is no shim, no fallback, no "did you mean" — see [docs/tasks/0021](../../docs/tasks/0021-deprecate-qlang-rename-cypher-to-query.md) for the rationale.
+- `fmql cypher` is removed as a standalone command.
+
+### Changed (BREAKING)
+
+- `fmql query` now speaks the Cypher subset that `fmql cypher` used to speak; it absorbed the old qlang command's name. The old qlang argument form (`'status = "active"'`) no longer parses — pass full Cypher (`'MATCH (t) WHERE t.status = "active" RETURN t'`).
+- `fmql subgraph` seed argument is now a Cypher query (e.g. `'MATCH (t) WHERE t.uuid = "task-1" RETURN t'`) instead of a qlang predicate.
+- `fmql index --filter` accepts a Cypher query instead of a qlang predicate.
+- The new `fmql query` keeps the old qlang command's traversal/search flags: `--follow`, `--depth`, `--direction`, `--include-origin`, `--search`, `--index`, `--index-location`. These chain a `Query` walk after the Cypher result and require `RETURN` to be a single packet variable.
+- `--format` on `fmql query` now supports `paths` (default for single-packet-var `RETURN`), `rows` (default otherwise), and `json`.
+
+### Unchanged
+
+- The Python kwargs API (`Query(ws).where(status="active", priority__gt=2)`) is unaffected — it builds `Predicate` nodes directly without going through any grammar.
+
 ## [0.2.3] - 2026-04-21
 
 ### Fixed

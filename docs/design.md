@@ -22,7 +22,7 @@ A Python package + CLI that treats a directory of frontmatter files the way Mong
 
 - **Relationships derived from query operators.** YAML doesn't have a "reference" type, so the engine doesn't pretend it does. When a user calls `follow("blocked_by")`, the engine resolves the values in that field as references (paths, UUIDs, slugs) and traverses. The query operation defines what a relationship is, not a schema.
 
-- **Graph patterns via Cypher-compatible subset.** For the ~5% of queries that need real graph shape (dependency chains, cycle detection, subgraph extraction), support a subset of Cypher pattern syntax. Not the foundation — an escape hatch for when filters + traversal aren't enough.
+- **Cypher-compatible query language.** Patterns, predicates, traversal, aggregation, and bulk edits all share one grammar — a Cypher subset. There's no separate "filter DSL" sitting alongside it; `MATCH (t) WHERE t.x = "y" RETURN t` is the canonical filter form, and `MATCH (a)-[:f*]->(b)` extends naturally into multi-hop graph patterns and cycle detection.
 
 - **Pluggable search indexes.** Minimal protocol: `search(query: str) -> Iterable[PacketId]`. Register any index (semantic, full-text, custom). Without one, falls back to text scan. Keeps the core dependency-free.
 

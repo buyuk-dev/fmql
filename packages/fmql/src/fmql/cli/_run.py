@@ -3,12 +3,24 @@ from __future__ import annotations
 import functools
 import sys
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Optional, Union
 
 import typer
 
 from fmql.edits import EditPlan
 from fmql.errors import FmqlError
+
+
+def parse_depth(depth: str) -> Union[int, str]:
+    if depth in ("*", "all"):
+        return "*"
+    try:
+        n = int(depth)
+    except ValueError as e:
+        raise FmqlError(f"invalid --depth {depth!r}: expected integer or '*'") from e
+    if n < 0:
+        raise FmqlError(f"invalid --depth {depth!r}: must be non-negative")
+    return n
 
 
 def resolve_workspace(flag: Optional[Path]) -> Path:

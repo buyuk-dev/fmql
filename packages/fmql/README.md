@@ -46,8 +46,8 @@ Requires Python 3.11+.
 CLI:
 
 ```bash
-fmql query 'type = "task" AND status != "done"' -w ./notes
-fmql query 'due_date < today' -w ./project --format json
+fmql query 'MATCH (t) WHERE t.type = "task" AND t.status != "done" RETURN t' -w ./notes
+fmql query 'MATCH (t) WHERE t.due_date < today+0d RETURN t' -w ./project --format json
 ```
 
 Every command takes `--workspace/-w` for the workspace root; if omitted, fmql uses the current working directory.
@@ -65,14 +65,13 @@ for packet in q:
 
 ## Features
 
-- **Filter DSL** — SQL-ish string queries, case-insensitive keywords, typed comparisons, date literals.
-- **Python kwargs API** — Django-style `field__op=value` with a full operator registry.
-- **Bulk edits via Cypher** — `fmql update 'MATCH … [WHERE …] [SET …] [REMOVE …]'` with `+=`, list comprehensions, unary `NOT`, and virtual properties (`t.path`, `t.filename`, `t.slug`). Every edit previews a unified diff and prompts before writing.
+- **Cypher query language** — `MATCH ... [WHERE ...] [SET|REMOVE ...] [RETURN ...] [ORDER BY ...]`, with virtual properties (`t.path`, `t.filename`, `t.slug`), list comprehensions, `+=`, unary `NOT`, and built-in functions (`resolve`, `field`, `slug`, `id`, `uuid`, `path`).
+- **Python kwargs API** — Django-style `field__op=value` with a full operator registry. Builds `Predicate` nodes directly; doesn't go through the Cypher grammar.
+- **Bulk edits via Cypher** — `fmql update 'MATCH … [WHERE …] [SET …] [REMOVE …]'`. Every edit previews a unified diff and prompts before writing.
 - **Format-preserving YAML** — round-trip via `ruamel.yaml`; edits preserve comments, key order, and quoting of untouched fields.
 - **Traversal** — `follow()` resolves reference fields (paths, UUIDs, slugs) forward or reverse, bounded or transitive.
 - **Aggregation** — `group_by(...).aggregate(Count, Sum, Avg, Min, Max)`.
 - **Describe** — workspace introspection: observed fields, types, distinct-value samples.
-- **Cypher subset** — graph patterns for dependency chains, cycle detection, multi-hop traversal.
 - **Pluggable search** — third-party backends register via Python entry points (`fmql.search_index`). Ships with a `grep` scan backend; third-party packages can add indexed backends (`fmql-fts`, `fmql-semantic`, …).
 
 ## Plugins
@@ -87,11 +86,10 @@ Official plugins live alongside core in the [fmql monorepo](https://github.com/b
 
 | Command | Purpose | Example |
 |---|---|---|
-| `query` | Run a filter query against a workspace | `fmql query 'status = "active"' -w ./project` |
+| `query` | Run a Cypher query against a workspace | `fmql query 'MATCH (t) WHERE t.status = "active" RETURN t' -w ./project` |
 | `describe` | Workspace introspection | `fmql describe -w ./project` |
-| `cypher` | Graph pattern query (Cypher subset, optional `SET`/`REMOVE`) | `fmql cypher 'MATCH (a)-[:blocked_by]->(b) RETURN a, b' -w ./project` |
 | `update` | Pattern-match and edit packets (`MATCH ... [SET\|REMOVE]`) | `fmql update 'MATCH (t) SET t.depends_on = slug(t.depends_on)' -w ./project` |
-| `subgraph` | Reachability closure around seed packets as `{nodes, edges}` JSON | `fmql subgraph 'uuid = "task-1"' -w ./project --follow blocked_by` |
+| `subgraph` | Reachability closure around seed packets as `{nodes, edges}` JSON | `fmql subgraph 'MATCH (t) WHERE t.uuid = "task-1" RETURN t' -w ./project --follow blocked_by` |
 | `search` | Run a search backend against a workspace/index | `fmql search 'alice' -w ./project` |
 | `index` | Build an index for an indexed backend | `fmql index --backend semantic -w ./project --out ./project/.fmql/semantic` |
 | `list-backends` | Enumerate discovered search backends | `fmql list-backends` |
@@ -100,30 +98,44 @@ Every command takes `--workspace/-w ROOT` (default: cwd). There are no longer an
 
 Common flags:
 
-- `--format {paths,json,rows}` — output format (default: `paths` for `query`, `rows` for `cypher`).
-- `--follow FIELD`, `--depth N|'*'`, `--direction {forward,reverse}` — traversal on `query` and `subgraph`.
-- `--resolver {path,uuid,slug,id}` — reference resolution strategy for traversal/Cypher/subgraph.
+- `--format {paths,json,rows}` — output format on `query`. Default infers from the query: `paths` when `RETURN` is a single packet variable (e.g. `RETURN t`), otherwise `rows`. `paths` requires a single packet variable in `RETURN`.
+- `--follow FIELD`, `--depth N|'*'`, `--direction {forward,reverse}`, `--include-origin` — traversal on `query` and `subgraph` (chained after the `MATCH` result; requires `RETURN` to be a single packet variable).
+- `--resolver {path,uuid,slug,id}` — default reference resolver for traversal and relationship hops.
 - `--format {raw,cytoscape}` — output shape for `subgraph` (default `raw`).
-- `--search QUERY`, `--index NAME`, `--index-location LOCATION` — pluggable search stage (backend default: `grep`).
-- `--diagnose` — on `query`, `subgraph`, and `cypher`: emit stderr `warning:` lines for reference values the active resolver could not match. Off by default; costs one extra workspace scan per follow-field. Enable globally for a workspace via `fmql.diagnose: true` in `WORKSPACE.md`.
-- `--dry-run`, `--yes` — preview or auto-confirm for `update` / `cypher` (when the query has a `SET` or `REMOVE`).
+- `--search QUERY`, `--index NAME`, `--index-location LOCATION` — pluggable search stage on `query` (backend default: `grep`).
+- `--diagnose` — on `query` and `subgraph`: emit stderr `warning:` lines for reference values the active resolver could not match. Off by default; costs one extra workspace scan per relationship field. Enable globally for a workspace via `fmql.diagnose: true` in `WORKSPACE.md`.
+- `--dry-run`, `--yes` — preview or auto-confirm on `query` / `update` when the query has a `SET` or `REMOVE`.
 
 Run `fmql <command> --help` for the full flag list on any command.
 
 ## Query syntax
 
-### Filter DSL (`query` command and `qlang`)
-
-Logical operators (case-insensitive):
+`fmql query` and `fmql update` both speak the same Cypher subset.
 
 ```
-AND   OR   NOT   ( ... )
+MATCH (a)-[:field]->(b)                 # single hop
+MATCH (a)-[:field*]->(b)                # transitive
+MATCH (a)-[:field*1..5]->(b)            # bounded depth
+MATCH (a)-[:blocked_by*]->(a)           # cycle detection
+WHERE a.status = "active" AND b.priority > 2
+SET a.status = "archived", a.label = b.title
+REMOVE a.draft_notes
+RETURN a
+RETURN a, b
+RETURN a.title
+RETURN count(a)
+ORDER BY a.priority DESC [NULLS LAST]   # sort returned rows; keys may reference
+                                        # any bound variable, not just RETURN items
 ```
 
-Comparisons:
+Node labels parse but are ignored (schemaless). `ORDER BY` supports multiple comma-separated keys (`var` or `var.field`) with per-key `ASC`/`DESC` and optional `NULLS FIRST` / `NULLS LAST`; default nulls policy matches SQL (`ASC` → nulls last).
+
+### `WHERE` operators
+
+Logical: `AND` / `OR` / `NOT` / `( ... )` (case-insensitive).
 
 ```
-= != > >= < <=
+= != <> > >= < <=
 CONTAINS      — substring match on strings/lists
 MATCHES       — regex match on strings
 IN [v1, v2]   — membership test
@@ -132,47 +144,22 @@ IS NOT EMPTY
 IS NULL
 ```
 
-Values: quoted strings (`"active"`), numbers (`42`, `3.14`), booleans (`true`, `false`), ISO dates (`2026-05-01`), and date sentinels:
-
-```
-today          now
-yesterday      tomorrow
-today-7d       now+1h        today+30d
-```
-
-Examples:
+Values: quoted strings (`"active"`), numbers (`42`, `3.14`), booleans (`true`, `false`), ISO dates (`2026-05-01`), and date sentinels with required offset (`today+0d`, `today-7d`, `now+1h`, `today+30d`).
 
 ```bash
-fmql query 'status = "active" AND priority > 2' -w ./project
-fmql query 'due_date < today AND status != "done"' -w ./project
-fmql query 'tags CONTAINS "urgent" OR priority >= 3' -w ./project
-fmql query 'status IN ["todo", "in_progress"]' -w ./project
-fmql query 'NOT (assigned_to IS EMPTY)' -w ./project
-fmql query 'title MATCHES "^\\[WIP\\]"' -w ./project
+fmql query 'MATCH (t) WHERE t.status = "active" AND t.priority > 2 RETURN t' -w ./project
+fmql query 'MATCH (t) WHERE t.due_date < today+0d AND t.status != "done" RETURN t' -w ./project
+fmql query 'MATCH (t) WHERE t.tags CONTAINS "urgent" OR t.priority >= 3 RETURN t' -w ./project
+fmql query 'MATCH (t) WHERE t.status IN ["todo", "in_progress"] RETURN t' -w ./project
+fmql query 'MATCH (t) WHERE NOT (t.assigned_to IS EMPTY) RETURN t' -w ./project
+fmql query 'MATCH (t) WHERE t.title MATCHES "^\\[WIP\\]" RETURN t' -w ./project
+fmql query 'MATCH (a)-[:blocked_by*]->(a) RETURN a' -w ./project
+fmql query 'MATCH (a)-[:belongs_to]->(e) WHERE e.type = "epic" RETURN a, e' -w ./project
 ```
-
-Ordering with `ORDER BY`:
-
-```
-<query> ORDER BY field [ASC|DESC] [NULLS FIRST|NULLS LAST] [, field …]
-```
-
-- `ASC` (default) or `DESC` per key.
-- `NULLS FIRST` / `NULLS LAST` is optional. Default follows SQL convention: `ASC` → nulls last, `DESC` → nulls first.
-- Multiple keys are evaluated left-to-right.
-- Values of different types are bucketed by type (booleans → numbers → dates → strings) so mixed-type fields don't raise.
-
-```bash
-fmql query 'status = "open" ORDER BY priority DESC' -w ./project
-fmql query '* ORDER BY due_date ASC NULLS LAST' -w ./project
-fmql query 'type = "task" ORDER BY status, priority DESC' -w ./project
-```
-
-`ORDER`, `BY`, `ASC`, `DESC`, `NULLS`, `FIRST`, `LAST` are reserved words (case-insensitive) in the query grammar.
 
 ### Python kwargs API
 
-`field__op=value` — everything before the final `__` is the field, everything after is the operator. No `__` means `eq`.
+The Python API does not go through the Cypher grammar — it builds `Predicate` nodes directly from `field__op=value` kwargs.
 
 | Operator | Matches when field value… |
 |---|---|
@@ -205,29 +192,7 @@ Query(ws).where(status="open").order_by("priority", desc=True)
 Query(ws).order_by("status").order_by("priority", desc=True, nulls="last")
 ```
 
-### Cypher subset (`cypher` command)
-
-```
-MATCH (a)-[:field]->(b)                 # single hop
-MATCH (a)-[:field*]->(b)                # transitive
-MATCH (a)-[:field*1..5]->(b)            # bounded depth
-MATCH (a)-[:blocked_by*]->(a)           # cycle detection
-WHERE a.status = "active" AND b.priority > 2
-SET a.status = "archived", a.label = b.title
-RETURN a
-RETURN a, b
-RETURN a.title
-RETURN count(a)
-ORDER BY a.priority DESC [NULLS LAST]   # sort returned rows; keys may reference
-                                        # any bound variable, not just RETURN items
-```
-
-Node labels parse but are ignored (schemaless). The `WHERE` clause uses the same operators as the filter DSL. `ORDER BY` supports multiple comma-separated keys (`var` or `var.field`) with per-key `ASC`/`DESC` and optional `NULLS FIRST` / `NULLS LAST`; default nulls policy matches SQL (`ASC` → nulls last).
-
-```bash
-fmql cypher 'MATCH (a)-[:blocked_by*]->(a) RETURN a' -w ./project
-fmql cypher 'MATCH (a)-[:belongs_to]->(e) WHERE e.type = "epic" RETURN a, e' -w ./project
-```
+### Cypher details
 
 #### Virtual properties
 
@@ -241,7 +206,7 @@ Every packet exposes three virtual properties derived from its workspace-relativ
 
 ```bash
 # Filter by file identity in MATCH/WHERE.
-fmql cypher 'MATCH (t) WHERE t.path = "tasks/task-42.md" RETURN t' -w ./project
+fmql query 'MATCH (t) WHERE t.path = "tasks/task-42.md" RETURN t' -w ./project
 
 # Use a virtual field on the right-hand side of SET.
 fmql update 'MATCH (t) WHERE t.title IS EMPTY SET t.title = t.slug' -w ./project
@@ -274,11 +239,11 @@ Built-in functions:
 
 When the first positional argument evaluates to a list, the call is broadcast element-wise (subsequent args stay scalar); unresolvable elements become `None` and are preserved in position.
 
-Both `fmql cypher` (when `SET`/`REMOVE` is present) and `fmql update` accept `--dry-run` (preview the diff without writing) and `--yes` (skip the confirm prompt).
+Both `fmql query` (when `SET`/`REMOVE` is present) and `fmql update` accept `--dry-run` (preview the diff without writing) and `--yes` (skip the confirm prompt).
 
 ### Editing via update
 
-`fmql update` is the one-stop shop for bulk edits. It requires a `SET` and/or `REMOVE` clause and rejects `RETURN`/`ORDER BY`; use `fmql cypher` when you want to write *and* project in the same query.
+`fmql update` is the one-stop shop for bulk edits. It requires a `SET` and/or `REMOVE` clause and rejects `RETURN`/`ORDER BY`; use `fmql query` when you want to write *and* project in the same query.
 
 ```bash
 # Migrate id-shaped references to slugs.
@@ -306,8 +271,8 @@ fmql update 'MATCH (t) WHERE t.assignee IS NOT EMPTY
 # Filter by virtual properties in WHERE.
 fmql update 'MATCH (t) WHERE t.path = "tasks/task-42.md" SET t.status = "done"' -w ./project
 
-# SET + RETURN: write then project the updated rows (use cypher).
-fmql cypher 'MATCH (t) WHERE t.status = "old" SET t.status = "archived" RETURN t' -w ./project --yes
+# SET + RETURN: write then project the updated rows (use `fmql query`).
+fmql query 'MATCH (t) WHERE t.status = "old" SET t.status = "archived" RETURN t' -w ./project --yes
 ```
 
 ## Traversal & resolvers
@@ -316,14 +281,16 @@ fmql cypher 'MATCH (t) WHERE t.status = "old" SET t.status = "archived" RETURN t
 
 ```bash
 # Direct dependencies of one task
-fmql query 'uuid = "task-42"' -w ./project --follow blocked_by --depth 1
+fmql query 'MATCH (t) WHERE t.uuid = "task-42" RETURN t' -w ./project --follow blocked_by --depth 1
 
 # Full transitive dependency chain
-fmql query 'uuid = "task-42"' -w ./project --follow blocked_by --depth '*'
+fmql query 'MATCH (t) WHERE t.uuid = "task-42" RETURN t' -w ./project --follow blocked_by --depth '*'
 
 # What does task-42 unblock? (reverse edge)
-fmql query 'uuid = "task-42"' -w ./project --follow blocked_by --direction reverse
+fmql query 'MATCH (t) WHERE t.uuid = "task-42" RETURN t' -w ./project --follow blocked_by --direction reverse
 ```
+
+`--follow` chains a graph walk after the Cypher result, so `RETURN` must be a single packet variable. Express native multi-hop traversal in `MATCH` itself when possible.
 
 References in frontmatter fields are resolved by the selected resolver:
 
@@ -364,11 +331,11 @@ For the whole reachability closure as structured graph data (not a row set), use
 
 ```bash
 # Default: {nodes, edges} for jq / custom pipelines
-fmql subgraph 'status = "active"' -w ./project --follow blocked_by
+fmql subgraph 'MATCH (t) WHERE t.status = "active" RETURN t' -w ./project --follow blocked_by
 
 # Cytoscape.js: {elements: {nodes, edges}} with data wrappers + synthesized edge IDs,
 # ready for cy.add(…) or cytoscape({elements: …})
-fmql subgraph 'status = "active"' -w ./project --follow blocked_by --format cytoscape > graph.json
+fmql subgraph 'MATCH (t) WHERE t.status = "active" RETURN t' -w ./project --follow blocked_by --format cytoscape > graph.json
 ```
 
 ## Aggregation & describe
@@ -397,7 +364,7 @@ fmql describe -w ./project --format json --top 10
 
 ## Editing & safety
 
-All edits go through `fmql update` (or `fmql cypher` if you also need `RETURN`). Every edit is previewable, confirmable, and preserves comments, key order, quoting, and body bytes. See [Editing via update](#editing-via-update) for the operator reference and recipe library.
+All edits go through `fmql update` (or `fmql query` if you also need `RETURN`). Every edit is previewable, confirmable, and preserves comments, key order, quoting, and body bytes. See [Editing via update](#editing-via-update) for the operator reference and recipe library.
 
 ```bash
 # Bulk migration with diff + confirm prompt

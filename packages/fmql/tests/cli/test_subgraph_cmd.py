@@ -8,22 +8,14 @@ from typer.testing import CliRunner
 from fmql.cli.main import app
 
 
-def _write_blocked_ws(root: Path) -> None:
-    """a (uuid=a) → b (uuid=b, blocked_by=a) → c (uuid=c, blocked_by=b)."""
-    root.mkdir(parents=True, exist_ok=True)
-    (root / "a.md").write_text("---\nuuid: a\n---\nA\n", encoding="utf-8")
-    (root / "b.md").write_text("---\nuuid: b\nblocked_by: a\n---\nB\n", encoding="utf-8")
-    (root / "c.md").write_text("---\nuuid: c\nblocked_by: b\n---\nC\n", encoding="utf-8")
-
-
-def test_subgraph_forward_single_hop(tmp_path: Path):
-    _write_blocked_ws(tmp_path)
+def test_subgraph_forward_single_hop(tmp_path: Path, write_blocked_ws):
+    write_blocked_ws(tmp_path)
     runner = CliRunner()
     result = runner.invoke(
         app,
         [
             "subgraph",
-            'uuid = "c"',
+            'MATCH (t) WHERE t.uuid = "c" RETURN t',
             "-w",
             str(tmp_path),
             "--follow",
@@ -42,14 +34,14 @@ def test_subgraph_forward_single_hop(tmp_path: Path):
     assert payload["edges"] == []
 
 
-def test_subgraph_forward_depth_star_full_closure(tmp_path: Path):
-    _write_blocked_ws(tmp_path)
+def test_subgraph_forward_depth_star_full_closure(tmp_path: Path, write_blocked_ws):
+    write_blocked_ws(tmp_path)
     runner = CliRunner()
     result = runner.invoke(
         app,
         [
             "subgraph",
-            'uuid = "c"',
+            'MATCH (t) WHERE t.uuid = "c" RETURN t',
             "-w",
             str(tmp_path),
             "--follow",
@@ -67,14 +59,14 @@ def test_subgraph_forward_depth_star_full_closure(tmp_path: Path):
     assert ("b.md", "a.md", "blocked_by") in edges
 
 
-def test_subgraph_reverse_direction(tmp_path: Path):
-    _write_blocked_ws(tmp_path)
+def test_subgraph_reverse_direction(tmp_path: Path, write_blocked_ws):
+    write_blocked_ws(tmp_path)
     runner = CliRunner()
     result = runner.invoke(
         app,
         [
             "subgraph",
-            'uuid = "a"',
+            'MATCH (t) WHERE t.uuid = "a" RETURN t',
             "-w",
             str(tmp_path),
             "--follow",
@@ -94,14 +86,14 @@ def test_subgraph_reverse_direction(tmp_path: Path):
     assert ("c.md", "b.md", "blocked_by") in edges
 
 
-def test_subgraph_ids_only(tmp_path: Path):
-    _write_blocked_ws(tmp_path)
+def test_subgraph_ids_only(tmp_path: Path, write_blocked_ws):
+    write_blocked_ws(tmp_path)
     runner = CliRunner()
     result = runner.invoke(
         app,
         [
             "subgraph",
-            'uuid = "c"',
+            'MATCH (t) WHERE t.uuid = "c" RETURN t',
             "-w",
             str(tmp_path),
             "--follow",
@@ -117,14 +109,14 @@ def test_subgraph_ids_only(tmp_path: Path):
         assert set(node.keys()) == {"id"}
 
 
-def test_subgraph_no_include_origin(tmp_path: Path):
-    _write_blocked_ws(tmp_path)
+def test_subgraph_no_include_origin(tmp_path: Path, write_blocked_ws):
+    write_blocked_ws(tmp_path)
     runner = CliRunner()
     result = runner.invoke(
         app,
         [
             "subgraph",
-            'uuid = "c"',
+            'MATCH (t) WHERE t.uuid = "c" RETURN t',
             "-w",
             str(tmp_path),
             "--follow",
@@ -140,14 +132,14 @@ def test_subgraph_no_include_origin(tmp_path: Path):
     assert ids == ["a.md", "b.md"]
 
 
-def test_subgraph_resolver_mismatch_emits_warning(tmp_path: Path):
-    _write_blocked_ws(tmp_path)
+def test_subgraph_resolver_mismatch_emits_warning(tmp_path: Path, write_blocked_ws):
+    write_blocked_ws(tmp_path)
     runner = CliRunner()
     result = runner.invoke(
         app,
         [
             "subgraph",
-            'uuid = "c"',
+            'MATCH (t) WHERE t.uuid = "c" RETURN t',
             "-w",
             str(tmp_path),
             "--follow",
@@ -162,14 +154,14 @@ def test_subgraph_resolver_mismatch_emits_warning(tmp_path: Path):
     assert "blocked_by" in result.stderr
 
 
-def test_subgraph_no_diagnose_flag_is_silent(tmp_path: Path):
-    _write_blocked_ws(tmp_path)
+def test_subgraph_no_diagnose_flag_is_silent(tmp_path: Path, write_blocked_ws):
+    write_blocked_ws(tmp_path)
     runner = CliRunner()
     result = runner.invoke(
         app,
         [
             "subgraph",
-            'uuid = "c"',
+            'MATCH (t) WHERE t.uuid = "c" RETURN t',
             "-w",
             str(tmp_path),
             "--follow",
@@ -180,15 +172,15 @@ def test_subgraph_no_diagnose_flag_is_silent(tmp_path: Path):
     assert "warning:" not in result.stderr
 
 
-def test_subgraph_diagnose_via_workspace_md(tmp_path: Path):
-    _write_blocked_ws(tmp_path)
+def test_subgraph_diagnose_via_workspace_md(tmp_path: Path, write_blocked_ws):
+    write_blocked_ws(tmp_path)
     (tmp_path / "WORKSPACE.md").write_text("---\nfmql:\n  diagnose: true\n---\n", encoding="utf-8")
     runner = CliRunner()
     result = runner.invoke(
         app,
         [
             "subgraph",
-            'uuid = "c"',
+            'MATCH (t) WHERE t.uuid = "c" RETURN t',
             "-w",
             str(tmp_path),
             "--follow",
@@ -209,7 +201,7 @@ def test_subgraph_warning_fires_on_partial_mismatch_with_nonempty_edges(tmp_path
         app,
         [
             "subgraph",
-            'uuid = "b"',
+            'MATCH (t) WHERE t.uuid = "b" RETURN t',
             "-w",
             str(tmp_path),
             "--follow",
@@ -225,14 +217,14 @@ def test_subgraph_warning_fires_on_partial_mismatch_with_nonempty_edges(tmp_path
     assert "warning:" in result.stderr
 
 
-def test_subgraph_invalid_depth_exits_2(tmp_path: Path):
-    _write_blocked_ws(tmp_path)
+def test_subgraph_invalid_depth_exits_2(tmp_path: Path, write_blocked_ws):
+    write_blocked_ws(tmp_path)
     runner = CliRunner()
     result = runner.invoke(
         app,
         [
             "subgraph",
-            'uuid = "c"',
+            'MATCH (t) WHERE t.uuid = "c" RETURN t',
             "-w",
             str(tmp_path),
             "--follow",
@@ -246,14 +238,14 @@ def test_subgraph_invalid_depth_exits_2(tmp_path: Path):
     assert result.exit_code == 2
 
 
-def test_subgraph_format_cytoscape(tmp_path: Path):
-    _write_blocked_ws(tmp_path)
+def test_subgraph_format_cytoscape(tmp_path: Path, write_blocked_ws):
+    write_blocked_ws(tmp_path)
     runner = CliRunner()
     result = runner.invoke(
         app,
         [
             "subgraph",
-            'uuid = "c"',
+            'MATCH (t) WHERE t.uuid = "c" RETURN t',
             "-w",
             str(tmp_path),
             "--follow",
@@ -277,14 +269,14 @@ def test_subgraph_format_cytoscape(tmp_path: Path):
         assert "frontmatter" in n["data"]
 
 
-def test_subgraph_format_cytoscape_ids_only(tmp_path: Path):
-    _write_blocked_ws(tmp_path)
+def test_subgraph_format_cytoscape_ids_only(tmp_path: Path, write_blocked_ws):
+    write_blocked_ws(tmp_path)
     runner = CliRunner()
     result = runner.invoke(
         app,
         [
             "subgraph",
-            'uuid = "c"',
+            'MATCH (t) WHERE t.uuid = "c" RETURN t',
             "-w",
             str(tmp_path),
             "--follow",
@@ -302,12 +294,12 @@ def test_subgraph_format_cytoscape_ids_only(tmp_path: Path):
         assert set(n["data"].keys()) == {"id"}
 
 
-def test_subgraph_format_raw_matches_default(tmp_path: Path):
-    _write_blocked_ws(tmp_path)
+def test_subgraph_format_raw_matches_default(tmp_path: Path, write_blocked_ws):
+    write_blocked_ws(tmp_path)
     runner = CliRunner()
     args = [
         "subgraph",
-        'uuid = "c"',
+        'MATCH (t) WHERE t.uuid = "c" RETURN t',
         "-w",
         str(tmp_path),
         "--follow",
@@ -322,14 +314,14 @@ def test_subgraph_format_raw_matches_default(tmp_path: Path):
     assert json.loads(default_result.stdout) == json.loads(raw_result.stdout)
 
 
-def test_subgraph_format_unknown_exits_2(tmp_path: Path):
-    _write_blocked_ws(tmp_path)
+def test_subgraph_format_unknown_exits_2(tmp_path: Path, write_blocked_ws):
+    write_blocked_ws(tmp_path)
     runner = CliRunner()
     result = runner.invoke(
         app,
         [
             "subgraph",
-            'uuid = "c"',
+            'MATCH (t) WHERE t.uuid = "c" RETURN t',
             "-w",
             str(tmp_path),
             "--follow",

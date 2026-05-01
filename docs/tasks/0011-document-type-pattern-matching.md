@@ -24,4 +24,4 @@ Today, packet "type" is implicit in convention (a `type:` field, a folder, a tag
 
 ## Notes
 
-Originally on the wishlist in `TODO.md`. Worth pairing with the SQL/qlang docs work ([0006](0006-sql-not-qlang-cheatsheet.md)) — type pattern matching is the kind of feature that needs concrete examples to land in users' heads.
+Originally on the wishlist in `TODO.md`. Type pattern matching is the kind of feature that needs concrete examples to land in users' heads, so prioritize a worked-example block in the README's Cypher section over abstract grammar docs.

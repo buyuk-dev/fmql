@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import pytest
+
+from fmql.ordering import OrderKey
 from fmql.query import Query
 from fmql.resolvers import UuidResolver
 
@@ -92,3 +95,49 @@ def test_follow_edit_sink(project_pm_ws):
     assert set(report.written) == {"tasks/task-1.md", "tasks/task-3.md"}
     for pid in report.written:
         assert project_pm_ws.packets[pid].frontmatter["status"] == "reviewed"
+
+
+# ---------- ordering (Python API) ----------
+
+
+@pytest.fixture
+def ordering_ws(make_workspace):
+    return make_workspace(
+        {
+            "p1.md": {"frontmatter": {"uuid": "p1", "priority": 3, "status": "open"}},
+            "p2.md": {"frontmatter": {"uuid": "p2", "priority": 1, "status": "open"}},
+            "p3.md": {"frontmatter": {"uuid": "p3", "priority": 5, "status": "done"}},
+            "p4.md": {"frontmatter": {"uuid": "p4", "priority": 2, "status": "open"}},
+            "p5.md": {"frontmatter": {"uuid": "p5", "status": "open"}},
+        }
+    )
+
+
+def _priorities(ids, ws):
+    return [ws.packets[pid].as_plain().get("priority") for pid in ids]
+
+
+def test_order_by_chainable(ordering_ws):
+    q = Query(ordering_ws).where(status="open").order_by("priority", desc=True)
+    assert _priorities(q.ids(), ordering_ws) == [None, 3, 2, 1]
+
+
+def test_order_by_multi_key_accumulates(make_workspace):
+    ws = make_workspace(
+        {
+            "a.md": {"frontmatter": {"status": "open", "priority": 2}},
+            "b.md": {"frontmatter": {"status": "open", "priority": 1}},
+            "c.md": {"frontmatter": {"status": "done", "priority": 3}},
+        }
+    )
+    q = Query(ws).order_by("status").order_by("priority", desc=True)
+    rows = [
+        (ws.packets[pid].as_plain()["status"], ws.packets[pid].as_plain()["priority"])
+        for pid in q.ids()
+    ]
+    assert rows == [("done", 3), ("open", 2), ("open", 1)]
+
+
+def test_order_key_validates_nulls():
+    with pytest.raises(ValueError):
+        OrderKey(field="x", nulls="bogus")

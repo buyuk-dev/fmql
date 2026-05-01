@@ -3,14 +3,14 @@ from __future__ import annotations
 import json
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import List, Optional
 
 import typer
 
-from fmql.cli._run import resolve_workspace
+from fmql.cli._run import parse_depth, resolve_workspace
 from fmql.diagnostics import maybe_emit_warnings
 from fmql.errors import FmqlError
-from fmql.qlang import compile_query
+from fmql.query import Query
 from fmql.resolvers import resolver_by_name
 from fmql.serialization import json_default
 from fmql.subgraph import collect_subgraph
@@ -23,20 +23,11 @@ class Direction(str, Enum):
     reverse = "reverse"
 
 
-def _parse_depth(depth: str) -> Union[int, str]:
-    if depth in ("*", "all"):
-        return "*"
-    try:
-        n = int(depth)
-    except ValueError as e:
-        raise FmqlError(f"invalid --depth {depth!r}: expected integer or '*'") from e
-    if n < 0:
-        raise FmqlError(f"invalid --depth {depth!r}: must be non-negative")
-    return n
-
-
 def subgraph_cmd(
-    query: str = typer.Argument(..., help="qlang expression selecting seed packets (or '*')."),
+    query: str = typer.Argument(
+        ...,
+        help="Cypher query (MATCH ... RETURN var) selecting seed packets.",
+    ),
     workspace: Optional[Path] = typer.Option(
         None, "--workspace", "-w", help="Workspace root (default: cwd)."
     ),
@@ -75,8 +66,8 @@ def subgraph_cmd(
     try:
         ws_root = resolve_workspace(workspace)
         ws = Workspace(ws_root)
-        seeds = compile_query(query, ws).ids()
-        d = _parse_depth(depth)
+        seeds = Query(ws).cypher(query).ids()
+        d = parse_depth(depth)
         r = resolver_by_name(resolver) if resolver else None
         sg = collect_subgraph(
             ws,
