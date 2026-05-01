@@ -214,6 +214,19 @@ fmql update 'MATCH (t) WHERE t.title IS EMPTY SET t.title = t.slug' -w ./project
 
 Frontmatter keys take precedence — if a packet already has its own `path` field, that value wins.
 
+For an identity that *cannot* be shadowed by frontmatter — useful when pinning a query to a specific document without adding bookkeeping fields — use the underscore-prefixed pseudo-fields:
+
+| Field | Value |
+|---|---|
+| `t._path` | workspace-relative POSIX path; not shadowable by frontmatter |
+| `t._id`   | stable packet identifier (currently aliased to `_path`)       |
+
+```bash
+fmql query 'MATCH (a)-[:links_to]->(b) WHERE a._path = "notes/inbox/today.md" RETURN b.title' -w ./notes
+```
+
+Pseudo-fields are read-only: `SET t._path = ...` and `REMOVE t._id` are rejected at validation time.
+
 #### `SET` and `REMOVE` (bulk migrations)
 
 `SET` rewrites frontmatter on matched packets, `REMOVE` deletes fields. Right-hand sides accept literals, qualified field references (`var.field`), function calls, list literals, list comprehensions, and unary `NOT`. A query may have `SET` only, `REMOVE` only, both, `RETURN` only, or any combination — when `SET`/`REMOVE` is paired with `RETURN`, the writes apply first, then `RETURN` projects against the post-write state (Neo4j ordering). Multiple bindings writing the same `(packet, field)` with different values is rejected as a conflict; `SET t.f = …` and `REMOVE t.f` on the same field is also rejected.

@@ -25,6 +25,7 @@ from fmql.cypher.ast import (
 )
 from fmql.cypher.compile import parse_cypher
 from fmql.cypher.expr import (
+    PSEUDO_FIELDS,
     EvalCtx,
     eval_predicate,
     eval_value_expr,
@@ -105,10 +106,17 @@ def _validate(ast: CypherAST) -> None:
     for set_item in ast.set_items:
         if set_item.var not in vars_declared:
             raise CypherError(f"SET references undeclared variable {set_item.var!r}")
+        _reject_pseudo_write("SET", set_item.var, set_item.field)
         _check_value_expr_vars(set_item.expr, vars_declared)
     for remove_item in ast.remove_items:
         if remove_item.var not in vars_declared:
             raise CypherError(f"REMOVE references undeclared variable {remove_item.var!r}")
+        _reject_pseudo_write("REMOVE", remove_item.var, remove_item.field)
+
+
+def _reject_pseudo_write(op: str, var: str, field: str) -> None:
+    if field in PSEUDO_FIELDS:
+        raise CypherError(f"cannot {op} pseudo-field {var}.{field}: pseudo-fields are read-only")
 
 
 def _check_where_vars(expr: ExprNode, declared: set[str]) -> None:
@@ -366,6 +374,8 @@ def _sort_bindings(
             return (None, True)
         if not fname:
             return (pid, False)
+        if fname in PSEUDO_FIELDS:
+            return (packet_field(workspace, pid, fname), False)
         packet = workspace.packets.get(pid)
         if packet is None:
             return (None, True)

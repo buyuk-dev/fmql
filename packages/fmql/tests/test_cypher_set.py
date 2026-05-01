@@ -193,3 +193,47 @@ def test_where_uses_virtual_slug(make_workspace):
     plan = compile_cypher_ast(ast, ws).plan
     pids = [op.packet_id for op in plan.ops]
     assert pids == ["docs/alpha.md"]
+
+
+def test_where_uses_pseudo_path(make_workspace):
+    spec = {
+        "docs/a.md": {"frontmatter": {"uuid": "a"}, "body": "a\n"},
+        "docs/b.md": {"frontmatter": {"uuid": "b"}, "body": "b\n"},
+    }
+    ws = make_workspace(spec)
+    ast = parse_cypher('MATCH (t) WHERE t._path = "docs/a.md" SET t.label = "first"')
+    plan = compile_cypher_ast(ast, ws).plan
+    assert [op.packet_id for op in plan.ops] == ["docs/a.md"]
+
+
+def test_where_uses_pseudo_id(make_workspace):
+    ws = make_workspace({"docs/a.md": {"frontmatter": {"uuid": "a"}, "body": "a\n"}})
+    ast = parse_cypher('MATCH (t) WHERE t._id = "docs/a.md" SET t.label = "x"')
+    plan = compile_cypher_ast(ast, ws).plan
+    assert [op.packet_id for op in plan.ops] == ["docs/a.md"]
+
+
+def test_pseudo_path_not_shadowed_by_frontmatter(make_workspace):
+    ws = make_workspace(
+        {
+            "docs/a.md": {
+                "frontmatter": {"uuid": "a", "_path": "lying"},
+                "body": "a\n",
+            },
+        }
+    )
+    ast = parse_cypher('MATCH (t) WHERE t._path = "docs/a.md" RETURN t')
+    result = compile_cypher_ast(ast, ws).result
+    assert result.rows == (("docs/a.md",),)
+
+
+def test_set_on_pseudo_field_rejected(make_workspace):
+    ws = make_workspace({"docs/a.md": {"frontmatter": {"uuid": "a"}, "body": "a\n"}})
+    with pytest.raises(CypherError, match="cannot SET pseudo-field t._path"):
+        compile_cypher_ast(parse_cypher('MATCH (t) SET t._path = "x"'), ws)
+
+
+def test_remove_on_pseudo_field_rejected(make_workspace):
+    ws = make_workspace({"docs/a.md": {"frontmatter": {"uuid": "a"}, "body": "a\n"}})
+    with pytest.raises(CypherError, match="cannot REMOVE pseudo-field t._id"):
+        compile_cypher_ast(parse_cypher("MATCH (t) REMOVE t._id"), ws)

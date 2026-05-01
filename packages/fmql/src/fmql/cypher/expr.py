@@ -26,6 +26,8 @@ Binding = dict[str, PacketId]
 # Frontmatter takes precedence: a frontmatter `path` shadows the virtual one.
 RESERVED_VIRTUAL_FIELDS: tuple[str, ...] = ("path", "filename", "slug")
 
+PSEUDO_FIELDS: tuple[str, ...] = ("_id", "_path")
+
 
 def virtual_field(pid: PacketId, name: str) -> Any:
     if name == "path":
@@ -37,8 +39,20 @@ def virtual_field(pid: PacketId, name: str) -> Any:
     raise CypherError(f"not a virtual field: {name}")
 
 
+def pseudo_field(pid: PacketId, name: str) -> Any:
+    if name in PSEUDO_FIELDS:
+        return pid
+    raise CypherError(f"not a pseudo-field: {name}")
+
+
 def packet_field(workspace: Workspace, pid: PacketId, name: str) -> Any:
-    """Read a packet field by name. Frontmatter wins; virtual fields fill the gap."""
+    """Read a packet field by name.
+
+    Pseudo-fields (`_id`, `_path`) bypass frontmatter — they are the canonical
+    identity. Otherwise frontmatter wins; virtual fields fill the gap.
+    """
+    if name in PSEUDO_FIELDS:
+        return pseudo_field(pid, name)
     packet = workspace.packets.get(pid)
     if packet is None:
         return None
