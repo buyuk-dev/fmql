@@ -1,29 +1,35 @@
 ---
+session_id: a8c83712-8a5d-442c-a205-77eec2e847b5
+task_id: 23
+branch: feature/expose-parser-api-at-top-level
 phase: done
+started: '2026-05-02T12:02:00Z'
 ---
 # Status
 
-Task **0022 — Resolve Cypher-compatibility divergences (`+=` semantics, function-name collisions)** finalized.
+Task **0023 — Expose the frontmatter parser API at the top level of the `fmql` package** finalized.
 
-Branch: `feature/cypher-compatibility-divergences`. Plan: `~/.claude/plans/get-started-on-task-whimsical-kite.md`.
+Branch: `feature/expose-parser-api-at-top-level`. Plan: `~/.claude/plans/get-started-on-task-humming-blossom.md`.
 
 ## Outcome
 
-- **Function registry** (`packages/fmql/src/fmql/cypher/expr.py`): dropped `_make_shortcut`, `_path`, and the `id` / `uuid` / `slug` / `path` entries from `REGISTRY`. The registry is now `{"resolve": _resolve, "field": _field}` — the two unambiguously fmql-specific primitives the four shortcuts decomposed into. Added a `_REMOVED_SHORTCUTS` map of name → explicit-composition hint and an `unknown_function_error(name)` factory; both the eval-time path (`eval_value_expr`) and the SET-validation path (`_check_value_expr_vars` in `executor.py`) call the same factory so the migration hint surfaces consistently from `query` and `update`.
-- **`+=` keeps list-append**: no code change. The grammar already restricts `+=` to `qualified_ident set_op value_expr`, and `edits.py`'s append op already initializes a missing field to `[expr]`. The decision is purely "lock the existing semantics in," driven by tests and docs.
-- **Tests**: replaced the two `test_slug_shortcut_*` cases in `test_cypher_expr.py` with a single parametrized `test_removed_shortcut_raises_with_hint` covering all four removed names and asserting the hint is in the error message. Added three explicit `+=` semantics tests in `test_cypher_set.py` — `test_append_initializes_when_field_absent`, `test_append_with_list_valued_rhs_nests`, `test_append_to_non_list_field_errors` — pinning the divergence the README now documents. Rewrote the `slug(t.deps)` example in `test_cypher.py:test_parse_set_function_call` to use `resolve(t.deps)`.
-- **Docs** (`packages/fmql/README.md`): dropped the four shortcut rows from the built-in functions table; added a "**Differs from Neo4j**" inline note to the `+=` row in the SET operator table; added a new "**Cypher subset — divergences from Neo4j**" subsection right after Built-in functions, listing each divergence (`+=`, `id()`, `path()`, `uuid()` / `slug()`) with Neo4j-vs-fmql columns and a link to ADR 0008. Updated the Features bullet (drops `slug, id, uuid, path` from the function list) and the Common-commands `update` example.
-- **ADR** (`docs/decisions/0008-cypher-divergences-from-neo4j.md`): single ADR covering both decisions. Sections: Context, Decision (`+=` and function-names sub-decisions), Rationale (why keep `+=` as list-append; why drop *all four* shortcuts not just the colliders; why one ADR), Consequences, Alternatives considered (`+=` rename, `+=` LHS-shape disambiguation, keep-and-document, namespace under `fmql.`, drop only direct colliders, two ADRs).
-- **Workflow housekeeping**: archived prior STATUS body to `docs/changelog/0005.md` (already created); flipped task 0022 to `done`; updated `docs/roadmap.md`; new `docs/changelog/0006.md` records this finalization.
+- **`packages/fmql/src/fmql/parser.py`**: made `pid` optional on both public entry points and added the docstrings the task called out as missing. `parse(text, *, abspath, pid=None)` and `parse_file(path, *, pid=None)` now default `pid` to `abspath.as_posix()` / `path.as_posix()` when omitted, so the standalone use case is `parse_file(Path("note.md"))` with zero ceremony. `abspath` stays required on `parse(text)` — `Packet.abspath: Path` is non-optional and synthesizing fake paths is task 0024 territory. The defaulting rule lives in one place: `parse` resolves it; `parse_file` just forwards `pid=pid`.
+- **`packages/fmql/src/fmql/__init__.py`**: re-exported `parse`, `parse_file`, and `serialize` (alias for `serialize_packet`) and added all three to `__all__`. `fmql.parser.serialize_packet` stays importable for existing callers (`edits.py:182`, `tests/test_parser_serialize.py:7`); only the shorter alias gets promoted to the front door.
+- **`Packet.serialize()`** (`packet.py:27`) untouched — its local import of `serialize_packet` keeps working.
+- **README.md**: new "Use fmql as a frontmatter parser" subsection between the Python quickstart and `## Features`. Three-line example (open file, mutate `frontmatter`, write back) plus a one-line note about lossless round-tripping. Targets the half of the audience that just wants a `python-frontmatter` replacement.
+- **Tests** (`packages/fmql/tests/test_public_api.py`, new): 8 cases pinning the public surface — `__all__` membership, `serialize is fmql.parser.serialize_packet` alias identity, `pid` defaults on both entry points, explicit-`pid` overrides, byte-exact round-trip via the alias on a real fixture, and a parse-mutate-serialize standalone flow.
+- **ADR** (`docs/decisions/0009-parser-public-surface-shape.md`): captures the three judgment calls — alias vs rename for `serialize_packet`, why `pid` defaults from the path while `abspath` stays required, and why only the alias appears in `__all__`. Rationale, consequences, and alternatives considered (including the deferred "abspath-less parsing" case).
+- **Workflow housekeeping**: archived prior STATUS body to `docs/changelog/0007.md`; flipped task 0023 to `done`; updated `docs/roadmap.md`.
 
 ## Verification
 
-- `make format` — clean.
-- `make lint` — clean.
-- `make test` — `fmql` 540 passed (was 536; +4 net: -2 slug-shortcut cases, +4 parametrized removed-shortcut cases, -1 slug-shortcut SET case, +3 `+=` semantics cases), `fmql-semantic` 56 passed.
+- `make format` — reformatted one file (`tests/test_public_api.py`); rerun clean.
+- `make lint` — failed once on `I001` (ruff wanted the aliased `serialize_packet as serialize` import on its own line, not chained with `parse, parse_file`); split the import line and re-ran clean.
+- `make test` — `fmql` 548 passed (was 540; +8 from the new `test_public_api.py`), `fmql-semantic` 56 passed.
 
 ## Notes
 
-- **`unknown_function_error` factory** is the only new module-level function in `expr.py`. It exists so the eval-time and validation-time error paths share a single message format. Without it, `executor.py:_check_value_expr_vars` and `expr.py:eval_value_expr` would each format their own "unknown function" string and drift over time — the consolidating refactor was a small bonus on top of the actual task work.
-- **`SET t.tags += t.extras` nests, not extends.** When the RHS is itself a list, the executor calls `current.append(value)` (per `edits.py:105`), so the list lands as a single nested element. The README and the new `test_append_with_list_valued_rhs_nests` test pin this. Diverges from Python's `list += list` muscle memory; documented loudly in the new divergences subsection.
-- **Breaking change**: `id(v)` / `uuid(v)` / `slug(v)` / `path(v)` now raise `CypherError("function <name>() was removed; use <hint> instead")`. Migration is mechanical via the hint. The maintainer's local scripts and notes were grepped during this task per the plan; no out-of-tree fix-ups in this PR.
+- **`pid` default is now part of the stable surface.** `parse_file(p).id == p.as_posix()` and `parse(t, abspath=p).id == p.as_posix()` are pinned by tests. Changing the default later (e.g. to `p.name`) would be a breaking change; the docstrings name the rule explicitly.
+- **Single source of truth for the defaulting rule.** Initial draft duplicated the `pid if pid is not None else …` expression in both `parse` and `parse_file`. The simplify pass collapsed it: `parse_file` now passes `pid=pid` straight through, `parse` is the only place the fallback lives.
+- **Ruff vs the consolidated import.** Tried `from fmql.parser import parse, parse_file, serialize_packet as serialize` to keep the re-export concise; ruff's `I001` rejects mixing aliased and non-aliased names in one statement and won't auto-fix to a form that satisfies both. The two-line split is the canonical form here.
+- **Coordinates with task [0024](docs/tasks/0024-rename-packet-type.md).** When `Packet` becomes `Document`, the top-level `serialize` alias absorbs the rename: `fmql.serialize` keeps its name, and `serialize_packet` would either become `serialize_document` or be kept as a deprecated re-export. The alias is the sidestep the task notes called out.

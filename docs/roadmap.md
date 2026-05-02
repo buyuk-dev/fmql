@@ -25,7 +25,7 @@ Last updated: 2026-05-02.
 | [0017](tasks/0017-frontmatter-document-serialization.md) | todo | 1 | Frontmatter documents — JSON / YAML (de)serialization |
 | [0005](tasks/0005-output-format-labels-disambiguation.md) | todo | 2 | Disambiguate `--format json` (NDJSON vs JSON-array) |
 | [0018](tasks/0018-subgraph-mermaid-format.md) | todo | 2 | Mermaid output format for `fmql subgraph` |
-| [0023](tasks/0023-expose-parser-api-at-top-level.md) | todo | 2 | Expose the frontmatter parser API at the top level |
+| [0023](tasks/0023-expose-parser-api-at-top-level.md) | done | 2 | Expose the frontmatter parser API at the top level |
 | [0024](tasks/0024-rename-packet-type.md) | todo | 2 | Rename `Packet` → `Document` (and `PacketId` → `DocumentId`) |
 | [0014](tasks/0014-visible-row-separator.md) | todo | 3 | Visible row separator in `rows` output format |
 

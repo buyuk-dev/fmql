@@ -1,10 +1,10 @@
 ---
 id: 0023
 title: Expose the frontmatter parser API at the top level of the `fmql` package
-status: todo
+status: done
 priority: 2
 created: 2026-05-01
-updated: 2026-05-01
+updated: 2026-05-02
 tags: [api, parser, frontmatter, public-surface]
 depends_on: []
 phase: cli

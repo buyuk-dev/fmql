@@ -57,7 +57,25 @@ def _fence_pattern(eol: str) -> re.Pattern[str]:
     )
 
 
-def parse(text: str, *, pid: PacketId, abspath: Path) -> Packet:
+def parse(text: str, *, abspath: Path, pid: Optional[PacketId] = None) -> Packet:
+    """Parse a frontmatter+markdown string into a :class:`Packet`.
+
+    Splits a leading YAML frontmatter block (delimited by ``---`` fences) from
+    the markdown body. The returned packet preserves enough state to round-trip
+    losslessly via :func:`serialize_packet`: BOM prefix, line-ending style
+    (``\\n`` vs ``\\r\\n``), fence delimiters, EOF newline, and YAML quoting /
+    key order on untouched fields.
+
+    Args:
+        text: Raw file contents.
+        abspath: Filesystem path the text logically lives at. Stored on the
+            returned :class:`Packet` and used as the default packet id.
+        pid: Stable identifier for the packet. Defaults to ``abspath.as_posix()``
+            when omitted.
+
+    Raises:
+        ParseError: When the frontmatter is not valid YAML or is not a mapping.
+    """
     raw_prefix = ""
     if text.startswith(BOM):
         raw_prefix = BOM
@@ -80,7 +98,7 @@ def parse(text: str, *, pid: PacketId, abspath: Path) -> Packet:
     frontmatter = _load_yaml(fm_text) if has_fm else CommentedMap()
 
     return Packet(
-        id=pid,
+        id=pid if pid is not None else abspath.as_posix(),
         abspath=abspath,
         frontmatter=frontmatter,
         body=body,
@@ -92,10 +110,28 @@ def parse(text: str, *, pid: PacketId, abspath: Path) -> Packet:
     )
 
 
-def parse_file(path: Path, *, pid: PacketId) -> Packet:
+def parse_file(path: Path, *, pid: Optional[PacketId] = None) -> Packet:
+    """Read a file from disk and parse it into a :class:`Packet`.
+
+    Convenience wrapper around :func:`parse` that opens ``path`` in text mode
+    with newline translation disabled, so the original line endings survive
+    into the returned packet. The same round-trip guarantees as :func:`parse`
+    apply.
+
+    Args:
+        path: Path to the file to read.
+        pid: Stable identifier for the packet. Defaults to ``path.as_posix()``
+            when omitted, which is suitable for standalone parser use; pass an
+            explicit workspace-relative id when loading inside a
+            :class:`~fmql.workspace.Workspace`.
+
+    Raises:
+        ParseError: When the frontmatter is not valid YAML or is not a mapping.
+        OSError: When the file cannot be opened.
+    """
     with open(path, "r", encoding="utf-8", newline="") as f:
         text = f.read()
-    return parse(text, pid=pid, abspath=path)
+    return parse(text, abspath=path, pid=pid)
 
 
 def dump_yaml(data: CommentedMap) -> str:
@@ -111,6 +147,25 @@ def serialize_packet(
     body: Optional[str] = None,
     force_frontmatter: Optional[bool] = None,
 ) -> str:
+    """Serialize a :class:`Packet` back to a string.
+
+    Round-trips byte-exactly when ``packet`` is unmodified: BOM prefix, line
+    endings, fence delimiters, EOF newline, and YAML quoting / key order on
+    untouched fields are all preserved. Re-exported at the top level as
+    :func:`fmql.serialize`.
+
+    Args:
+        packet: The packet to serialize.
+        frontmatter: Optional override for the frontmatter mapping. When
+            provided, the original ``packet.frontmatter`` is ignored. Useful
+            when applying an in-place edit without mutating the parsed packet.
+        body: Optional override for the markdown body. When provided, the
+            original ``packet.body`` is ignored.
+        force_frontmatter: Override the heuristic that decides whether to emit
+            a frontmatter block at all. ``None`` (default) emits a block when
+            the source had one or when the (effective) frontmatter is
+            non-empty; ``True`` always emits; ``False`` never emits.
+    """
     fm = packet.frontmatter if frontmatter is None else frontmatter
     b = packet.body if body is None else body
     eol = packet.eol

@@ -63,6 +63,24 @@ for packet in q:
     print(packet.id)
 ```
 
+### Use fmql as a frontmatter parser
+
+If you only need a frontmatter-aware markdown parser — no workspace, no query
+engine — `parse`, `parse_file`, and `serialize` are exposed at the top level:
+
+```python
+from pathlib import Path
+from fmql import parse_file, serialize
+
+doc = parse_file(Path("note.md"))
+doc.frontmatter["status"] = "done"
+Path("note.md").write_text(serialize(doc))
+```
+
+Round-trips preserve BOM, line endings, fence style, EOF newline, and YAML
+quoting / key order on untouched fields. Use `parse(text, abspath=...)` when
+you have the contents in memory rather than on disk.
+
 ## Features
 
 - **Cypher query language** — `MATCH ... [WHERE ...] [SET|REMOVE ...] [RETURN ...] [ORDER BY ...] [LIMIT N]`, with virtual properties (`t.path`, `t.filename`, `t.slug`), list comprehensions, `+=`, unary `NOT`, and built-in functions (`resolve`, `field`).
