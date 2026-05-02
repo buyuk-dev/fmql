@@ -62,15 +62,6 @@ def test_set_with_function_call_migrates_ids_to_slugs(id_refs_ws):
     assert list(c["depends_on"]) == ["alpha", "bravo"]
 
 
-def test_set_with_slug_shortcut(id_refs_ws):
-    # slug(v) requires v to match the slug resolver (via slug field or stem).
-    # For id-shaped values, use the field(resolve(..., "id"), "slug") form instead.
-    spec_ast = parse_cypher('MATCH (t) WHERE t.id = 1 SET t.label = "first"')
-    execution = compile_cypher_ast(spec_ast, id_refs_ws)
-    execution.plan.apply(confirm=False)
-    assert id_refs_ws.packets["tasks/a.md"].as_plain()["label"] == "first"
-
-
 def test_set_with_return_runs_both(status_ws):
     ast = parse_cypher('MATCH (t) WHERE t.status = "old" SET t.status = "archived" RETURN t')
     execution = compile_cypher_ast(ast, status_ws)
@@ -147,6 +138,42 @@ def test_append_and_set_same_field_conflict(make_workspace):
     ast = parse_cypher('MATCH (t) SET t.tags = ["x"], t.tags += "y"')
     with pytest.raises(CypherError, match="conflict"):
         compile_cypher_ast(ast, ws)
+
+
+def test_append_initializes_when_field_absent(make_workspace):
+    """`SET t.f += v` on a missing field initializes to `[v]` (locked-in divergence)."""
+    spec = {"a.md": {"frontmatter": {"uuid": "a"}, "body": "a\n"}}
+    ws = make_workspace(spec)
+    ast = parse_cypher('MATCH (t) SET t.tags += "first"')
+    compile_cypher_ast(ast, ws).plan.apply(confirm=False)
+    assert ws.packets["a.md"].as_plain()["tags"] == ["first"]
+
+
+def test_append_with_list_valued_rhs_nests(make_workspace):
+    """`+=` appends the RHS as a single element, even when the RHS is itself a list.
+
+    Diverges from Python's `list += list` extend; pinned for the divergences doc.
+    """
+    spec = {
+        "a.md": {
+            "frontmatter": {"uuid": "a", "tags": ["one"], "extras": ["two", "three"]},
+            "body": "a\n",
+        }
+    }
+    ws = make_workspace(spec)
+    ast = parse_cypher("MATCH (t) SET t.tags += t.extras")
+    compile_cypher_ast(ast, ws).plan.apply(confirm=False)
+    assert list(ws.packets["a.md"].as_plain()["tags"]) == ["one", ["two", "three"]]
+
+
+def test_append_to_non_list_field_errors(make_workspace):
+    """`+=` against a non-list, non-absent field reports an error per packet."""
+    spec = {"a.md": {"frontmatter": {"uuid": "a", "tags": "single"}, "body": "a\n"}}
+    ws = make_workspace(spec)
+    ast = parse_cypher('MATCH (t) SET t.tags += "more"')
+    report = compile_cypher_ast(ast, ws).plan.apply(confirm=False)
+    assert report.errors and "non-list" in report.errors[0][1]
+    assert ws.packets["a.md"].as_plain()["tags"] == "single"
 
 
 def test_set_list_literal_writes_list(make_workspace):

@@ -65,7 +65,7 @@ for packet in q:
 
 ## Features
 
-- **Cypher query language** — `MATCH ... [WHERE ...] [SET|REMOVE ...] [RETURN ...] [ORDER BY ...] [LIMIT N]`, with virtual properties (`t.path`, `t.filename`, `t.slug`), list comprehensions, `+=`, unary `NOT`, and built-in functions (`resolve`, `field`, `slug`, `id`, `uuid`, `path`).
+- **Cypher query language** — `MATCH ... [WHERE ...] [SET|REMOVE ...] [RETURN ...] [ORDER BY ...] [LIMIT N]`, with virtual properties (`t.path`, `t.filename`, `t.slug`), list comprehensions, `+=`, unary `NOT`, and built-in functions (`resolve`, `field`).
 - **Python kwargs API** — Django-style `field__op=value` with a full operator registry. Builds `Predicate` nodes directly; doesn't go through the Cypher grammar.
 - **Bulk edits via Cypher** — `fmql update 'MATCH … [WHERE …] [SET …] [REMOVE …]'`. Every edit previews a unified diff and prompts before writing.
 - **Format-preserving YAML** — round-trip via `ruamel.yaml`; edits preserve comments, key order, and quoting of untouched fields.
@@ -88,7 +88,7 @@ Official plugins live alongside core in the [fmql monorepo](https://github.com/b
 |---|---|---|
 | `query` | Run a Cypher query against a workspace | `fmql query 'MATCH (t) WHERE t.status = "active" RETURN t' -w ./project` |
 | `describe` | Workspace introspection | `fmql describe -w ./project` |
-| `update` | Pattern-match and edit packets (`MATCH ... [SET\|REMOVE]`) | `fmql update 'MATCH (t) SET t.depends_on = slug(t.depends_on)' -w ./project` |
+| `update` | Pattern-match and edit packets (`MATCH ... [SET\|REMOVE]`) | `fmql update 'MATCH (t) SET t.depends_on = field(resolve(t.depends_on, "slug"), "slug")' -w ./project` |
 | `subgraph` | Reachability closure around seed packets as `{nodes, edges}` JSON | `fmql subgraph 'MATCH (t) WHERE t.uuid = "task-1" RETURN t' -w ./project --follow blocked_by` |
 | `search` | Run a search backend against a workspace/index | `fmql search 'alice' -w ./project` |
 | `index` | Build an index for an indexed backend | `fmql index --backend semantic -w ./project --out ./project/.fmql/semantic` |
@@ -249,7 +249,7 @@ Pseudo-fields are read-only: `SET t._path = ...` and `REMOVE t._id` are rejected
 | Operator | Behavior |
 |---|---|
 | `SET t.field = expr` | Replace the field with `expr`. |
-| `SET t.field += expr` | Append `expr` to the existing list (or initialize to `[expr]`). |
+| `SET t.field += expr` | Append `expr` to the existing list, or initialize to `[expr]` when the field is absent. **Differs from Neo4j**: Cypher's `+=` is map-merge at the node level (`SET n += {prop: value}`); fmql's is list-append at the property level. See [Cypher subset — divergences from Neo4j](#cypher-subset--divergences-from-neo4j). |
 | `SET t.field = NOT t.field` | Boolean toggle (broadcasts element-wise over lists). |
 | `SET t.field = [x IN t.list WHERE pred (\| projection)?]` | Neo4j-style list comprehension. Use it to filter or project list-valued fields. |
 
@@ -260,12 +260,25 @@ Built-in functions:
 | `resolve(v)` | Resolve `v` via the workspace's default resolver (or per-field binding) → packet id. |
 | `resolve(v, "<name>")` | Resolve via a specific resolver: `path`, `uuid`, `slug`, or `id`. |
 | `field(pid, "<name>")` | Read frontmatter field `name` from packet `pid` (returns `None` if `pid` is `None` or the field is missing). |
-| `slug(v)` / `id(v)` / `uuid(v)` | Shortcut for `field(resolve(v, "<name>"), "<name>")`. |
-| `path(v)` | Shortcut for `resolve(v, "path")` — returns the relative packet id. |
 
 When the first positional argument evaluates to a list, the call is broadcast element-wise (subsequent args stay scalar); unresolvable elements become `None` and are preserved in position.
 
+Compose `field` and `resolve` for the common id-to-field migrations: `field(resolve(t.depends_on, "id"), "slug")` reads each `depends_on` value, looks up the packet whose `id` matches, and returns that packet's `slug` field.
+
 Both `fmql query` (when `SET`/`REMOVE` is present) and `fmql update` accept `--dry-run` (preview the diff without writing) and `--yes` (skip the confirm prompt).
+
+#### Cypher subset — divergences from Neo4j
+
+fmql's grammar borrows Cypher's surface syntax but targets a frontmatter graph rather than a Neo4j store. A few constructs read like real Cypher and mean something different. They are listed here so Neo4j muscle memory does not turn into silent footguns.
+
+| Construct | Neo4j semantics | fmql semantics |
+|---|---|---|
+| `SET t.field += expr` | Not legal — Neo4j's `+=` is **map-merge at node level** (`SET n += {prop: value}`) and is undefined at property level. | **List-append** on a single property. Initializes to `[expr]` when the field is absent. The RHS is appended as a single element even if it is itself a list (`SET t.tags += t.extras` → nested). |
+| `id(n)` | Returns the engine-assigned numeric node id. | Removed in fmql. There is no engine-assigned numeric id; for stable identity, use the `_id` / `_path` pseudo-fields, which are not shadowable by frontmatter. |
+| `path(...)` | The `path` type is a sequence of nodes and relationships. | Removed in fmql. To resolve a value through the path resolver, write `resolve(v, "path")` explicitly. |
+| `uuid(...)` / `slug(...)` | Not Cypher built-ins today, but exist in plugin libraries and may land in standard Cypher. | Removed in fmql. Compose explicitly: `field(resolve(v, "uuid"), "uuid")`, `field(resolve(v, "slug"), "slug")`. |
+
+The chosen direction for these divergences is captured in [`docs/decisions/0008-cypher-divergences-from-neo4j.md`](../../docs/decisions/0008-cypher-divergences-from-neo4j.md). Future divergences will be appended to this section.
 
 ### Editing via update
 
@@ -273,9 +286,6 @@ Both `fmql query` (when `SET`/`REMOVE` is present) and `fmql update` accept `--d
 
 ```bash
 # Migrate id-shaped references to slugs.
-fmql update 'MATCH (t) SET t.depends_on = slug(t.depends_on)' -w ./project
-
-# Compose: id → packet → slug field.
 fmql update 'MATCH (t) SET t.depends_on = field(resolve(t.depends_on, "id"), "slug")' -w ./project
 
 # Append to a list-valued field.

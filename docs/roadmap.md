@@ -2,7 +2,7 @@
 
 A snapshot of in-flight and queued work. The source of truth is `docs/tasks/` — this file is regenerated from it. Run `fmql query 'MATCH (t) RETURN t.id, t.title, t.status, t.priority, t.phase ORDER BY t.priority, t.id' -w docs/tasks --format rows` to refresh.
 
-Last updated: 2026-05-01.
+Last updated: 2026-05-02.
 
 ## Phase: cypher (the query language)
 
@@ -15,7 +15,7 @@ Last updated: 2026-05-01.
 | [0020](tasks/0020-qlang-not-in-null-literal.md) | done | 2 | `NOT IN`, `null` literal, `IS NOT NULL` in Cypher WHERE |
 | [0010](tasks/0010-cypher-limit-clause.md) | done | 3 | Cypher `LIMIT N` clause and `--limit` flag |
 | [0016](tasks/0016-cypher-return-literals.md) | done | 3 | Allow string / number literals as `RETURN` items |
-| [0022](tasks/0022-cypher-compatibility-divergences.md) | todo | 3 | Resolve Cypher-compatibility divergences |
+| [0022](tasks/0022-cypher-compatibility-divergences.md) | done | 3 | Resolve Cypher-compatibility divergences |
 
 ## Phase: cli
 

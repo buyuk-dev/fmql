@@ -168,10 +168,10 @@ def test_parse_set_qualified_ref():
 def test_parse_set_function_call():
     from fmql.cypher.ast import CallExpr, FieldRef
 
-    ast = parse_cypher("MATCH (t) SET t.deps = slug(t.deps)")
+    ast = parse_cypher("MATCH (t) SET t.deps = resolve(t.deps)")
     expr = ast.set_items[0].expr
     assert isinstance(expr, CallExpr)
-    assert expr.name == "slug"
+    assert expr.name == "resolve"
     assert expr.args == (FieldRef(var="t", field="deps"),)
 
 

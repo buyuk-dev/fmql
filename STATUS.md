@@ -1,35 +1,29 @@
 ---
-session_id: dbff95e4-6319-45b8-b80b-ea131dcc5a1f
-task_id: 16
-branch: feature/cypher-return-literals
 phase: done
-started: '2026-05-01T21:47:51Z'
 ---
 # Status
 
-Task **0016 — Allow string / number literals as `RETURN` items** finalized.
+Task **0022 — Resolve Cypher-compatibility divergences (`+=` semantics, function-name collisions)** finalized.
 
-Branch: `feature/cypher-return-literals`. Plan: `~/.claude/plans/get-started-on-task-lively-toucan.md`.
+Branch: `feature/cypher-compatibility-divergences`. Plan: `~/.claude/plans/get-started-on-task-whimsical-kite.md`.
 
 ## Outcome
 
-- Grammar (`packages/fmql/src/fmql/cypher/grammar.lark`): two new `return_item` alternatives — `ESCAPED_STRING -> r_string` and `SIGNED_NUMBER -> r_number`. No new tokens; both lexemes were already imported for the `value` rule.
-- AST (`cypher/ast.py`): added `ReturnString(value, text)` and `ReturnNumber(value, text)` dataclasses; widened `ReturnItem` union accordingly. The `text` field carries the literal's source form so the executor can use it as the column name without re-quoting strings or normalizing number formats.
-- Compiler (`cypher/compile.py`): new `r_string` / `r_number` transformer methods; the int-vs-float dispatch (`"." in s or "e" in s or "E" in s`) was lifted into a module-level `_parse_number(text)` helper now shared by both `r_number` (new) and `v_number` (existing). The `return_clause` `isinstance` filter widened from three to five admitted types.
-- Executor (`cypher/executor.py`): `_validate` skips literal items in the `RETURN`-references-undeclared-variable check (literals have no `.var`); `_column_name` returns `r.text` for both literal types; `_project_item` returns `r.value` before any binding lookup so projection works on patterns where the literal's `.var`-less shape would otherwise crash.
-- Tests: 5 new cases in `packages/fmql/tests/test_cypher.py` — three parsing tests (string, number with int/float discrimination, mixed literals + property accesses) and two execution tests using the existing `project_pm_ws` fixture (string-as-middle-column shape, number literal preserves `int` type through projection).
-- Docs: README's cypher syntax block now shows `RETURN a.title, "|", b.title` and `RETURN a.title, 1` with a one-line note explaining the constant-column / source-form-name semantics. ADR `docs/decisions/0007-return-literal-column-naming.md` records the source-form column-name choice with rationale and rejected alternatives (unwrapped value, `col_N`, single `ReturnLiteral`, `AS` aliasing).
-- `/simplify` review pass: extracted the int-vs-float dispatch into the shared `_parse_number` helper (flagged by both reuse and quality reviewers as a divergence risk between `r_number` and `v_number`); dropped the misleading `value: Any` local annotation from `r_number`. Kept the `text` field on `ReturnString` / `ReturnNumber` (deriving it from `value` would lose source-form info — `repr("|")` produces `'|'`, `str(1e2)` produces `100.0`).
-- Workflow housekeeping: archived prior STATUS body to `docs/changelog/0004.md`; flipped task 0016 to `done`; updated `docs/roadmap.md`.
+- **Function registry** (`packages/fmql/src/fmql/cypher/expr.py`): dropped `_make_shortcut`, `_path`, and the `id` / `uuid` / `slug` / `path` entries from `REGISTRY`. The registry is now `{"resolve": _resolve, "field": _field}` — the two unambiguously fmql-specific primitives the four shortcuts decomposed into. Added a `_REMOVED_SHORTCUTS` map of name → explicit-composition hint and an `unknown_function_error(name)` factory; both the eval-time path (`eval_value_expr`) and the SET-validation path (`_check_value_expr_vars` in `executor.py`) call the same factory so the migration hint surfaces consistently from `query` and `update`.
+- **`+=` keeps list-append**: no code change. The grammar already restricts `+=` to `qualified_ident set_op value_expr`, and `edits.py`'s append op already initializes a missing field to `[expr]`. The decision is purely "lock the existing semantics in," driven by tests and docs.
+- **Tests**: replaced the two `test_slug_shortcut_*` cases in `test_cypher_expr.py` with a single parametrized `test_removed_shortcut_raises_with_hint` covering all four removed names and asserting the hint is in the error message. Added three explicit `+=` semantics tests in `test_cypher_set.py` — `test_append_initializes_when_field_absent`, `test_append_with_list_valued_rhs_nests`, `test_append_to_non_list_field_errors` — pinning the divergence the README now documents. Rewrote the `slug(t.deps)` example in `test_cypher.py:test_parse_set_function_call` to use `resolve(t.deps)`.
+- **Docs** (`packages/fmql/README.md`): dropped the four shortcut rows from the built-in functions table; added a "**Differs from Neo4j**" inline note to the `+=` row in the SET operator table; added a new "**Cypher subset — divergences from Neo4j**" subsection right after Built-in functions, listing each divergence (`+=`, `id()`, `path()`, `uuid()` / `slug()`) with Neo4j-vs-fmql columns and a link to ADR 0008. Updated the Features bullet (drops `slug, id, uuid, path` from the function list) and the Common-commands `update` example.
+- **ADR** (`docs/decisions/0008-cypher-divergences-from-neo4j.md`): single ADR covering both decisions. Sections: Context, Decision (`+=` and function-names sub-decisions), Rationale (why keep `+=` as list-append; why drop *all four* shortcuts not just the colliders; why one ADR), Consequences, Alternatives considered (`+=` rename, `+=` LHS-shape disambiguation, keep-and-document, namespace under `fmql.`, drop only direct colliders, two ADRs).
+- **Workflow housekeeping**: archived prior STATUS body to `docs/changelog/0005.md` (already created); flipped task 0022 to `done`; updated `docs/roadmap.md`; new `docs/changelog/0006.md` records this finalization.
 
 ## Verification
 
 - `make format` — clean.
 - `make lint` — clean.
-- `make test` — `fmql` 536 passed (was 531; +5 new tests), `fmql-semantic` 56 passed.
+- `make test` — `fmql` 540 passed (was 536; +4 net: -2 slug-shortcut cases, +4 parametrized removed-shortcut cases, -1 slug-shortcut SET case, +3 `+=` semantics cases), `fmql-semantic` 56 passed.
 
 ## Notes
 
-- **Source-form column names** are the result of an explicit ADR (`0007`). Strings get quoted column names (`"|"`), numbers get their literal form (`1`, `-3.14`). Duplicate literals produce duplicate column names, mirroring the existing `RETURN a.title, a.title` permissiveness.
-- **No `AS alias` support yet.** Cypher-spec column aliasing (`RETURN "|" AS sep`) is the long-term answer for clean column names but adds grammar / formatter questions out of scope for this task. Deferred.
-- **`ReturnString.value` and `.text` are intentionally redundant.** The redundancy stores parser state (`text`) alongside the parsed value; the alternative — recomputing one from the other — loses information for strings (re-quoting fails on escape chars) and numbers (Python normalizes `1e2` to `100.0`). Documented in ADR 0007.
+- **`unknown_function_error` factory** is the only new module-level function in `expr.py`. It exists so the eval-time and validation-time error paths share a single message format. Without it, `executor.py:_check_value_expr_vars` and `expr.py:eval_value_expr` would each format their own "unknown function" string and drift over time — the consolidating refactor was a small bonus on top of the actual task work.
+- **`SET t.tags += t.extras` nests, not extends.** When the RHS is itself a list, the executor calls `current.append(value)` (per `edits.py:105`), so the list lands as a single nested element. The README and the new `test_append_with_list_valued_rhs_nests` test pin this. Diverges from Python's `list += list` muscle memory; documented loudly in the new divergences subsection.
+- **Breaking change**: `id(v)` / `uuid(v)` / `slug(v)` / `path(v)` now raise `CypherError("function <name>() was removed; use <hint> instead")`. Migration is mechanical via the hint. The maintainer's local scripts and notes were grepped during this task per the plan; no out-of-tree fix-ups in this PR.

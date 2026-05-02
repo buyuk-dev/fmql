@@ -33,6 +33,7 @@ from fmql.cypher.expr import (
     eval_value_expr,
     is_known_function,
     packet_field,
+    unknown_function_error,
 )
 from fmql.edits import EditOp, EditPlan
 from fmql.errors import CypherError
@@ -169,7 +170,7 @@ def _check_value_expr_vars(expr: ValueExpr, declared: set[str]) -> None:
         return
     if isinstance(expr, CallExpr):
         if not is_known_function(expr.name):
-            raise CypherError(f"unknown function in SET expression: {expr.name}()")
+            raise unknown_function_error(expr.name)
         for arg in expr.args:
             _check_value_expr_vars(arg, declared)
         return

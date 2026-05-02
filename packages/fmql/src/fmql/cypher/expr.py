@@ -110,38 +110,37 @@ def _field(ctx: EvalCtx, args: tuple[Any, ...]) -> Any:
     return packet_field(ctx.workspace, pid, fname)
 
 
-def _make_shortcut(resolver_name: str) -> CallFn:
-    def fn(ctx: EvalCtx, args: tuple[Any, ...]) -> Any:
-        if len(args) != 1:
-            raise CypherError(f"{resolver_name}() takes 1 argument, got {len(args)}")
-        resolver = _resolver_for(resolver_name)
-        pid = resolver.resolve(args[0], origin=ctx.origin, workspace=ctx.workspace)
-        if pid is None:
-            return None
-        return packet_field(ctx.workspace, pid, resolver_name)
-
-    return fn
-
-
-def _path(ctx: EvalCtx, args: tuple[Any, ...]) -> Any:
-    if len(args) != 1:
-        raise CypherError(f"path() takes 1 argument, got {len(args)}")
-    resolver = _resolver_for("path")
-    return resolver.resolve(args[0], origin=ctx.origin, workspace=ctx.workspace)
-
-
 REGISTRY: dict[str, CallFn] = {
     "resolve": _resolve,
     "field": _field,
-    "slug": _make_shortcut("slug"),
-    "id": _make_shortcut("id"),
-    "uuid": _make_shortcut("uuid"),
-    "path": _path,
+}
+
+# Names that used to be shortcuts in fmql's Cypher subset but collided with — or
+# resembled — Cypher's own built-ins (`id()`, `path` as a sequence type). Removed
+# in task 0022; the dispatch error points at the explicit composition.
+_REMOVED_SHORTCUTS: dict[str, str] = {
+    "id": 'field(resolve(v, "id"), "id")',
+    "uuid": 'field(resolve(v, "uuid"), "uuid")',
+    "slug": 'field(resolve(v, "slug"), "slug")',
+    "path": 'resolve(v, "path")',
 }
 
 
 def is_known_function(name: str) -> bool:
     return name in REGISTRY
+
+
+def unknown_function_error(name: str) -> CypherError:
+    """Build the right error for a function name fmql does not know.
+
+    Names listed in `_REMOVED_SHORTCUTS` get a hint pointing at the explicit
+    composition the user should write instead; everything else gets the plain
+    "unknown function" message.
+    """
+    hint = _REMOVED_SHORTCUTS.get(name)
+    if hint is not None:
+        return CypherError(f"function {name}() was removed; use {hint} instead")
+    return CypherError(f"unknown function in SET expression: {name}()")
 
 
 def eval_value_expr(expr: ValueExpr, ctx: EvalCtx) -> Any:
@@ -164,7 +163,7 @@ def eval_value_expr(expr: ValueExpr, ctx: EvalCtx) -> Any:
     if isinstance(expr, CallExpr):
         fn = REGISTRY.get(expr.name)
         if fn is None:
-            raise CypherError(f"unknown function in SET expression: {expr.name}()")
+            raise unknown_function_error(expr.name)
         return _eval_call(fn, expr.args, ctx)
     if isinstance(expr, UnaryOp):
         if expr.op == "not":

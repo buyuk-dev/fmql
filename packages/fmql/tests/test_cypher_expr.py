@@ -62,16 +62,22 @@ def test_field_none_pid(id_ws):
     assert eval_value_expr(expr, _ctx(id_ws)) is None
 
 
-def test_slug_shortcut_via_id_lookup(id_ws):
-    # When called with an id, slug() resolves via SlugResolver — but SlugResolver
-    # falls back to file stem too. With value=8 (int), no match.
-    expr = CallExpr(name="slug", args=(LiteralExpr(value=8),))
-    assert eval_value_expr(expr, _ctx(id_ws)) is None
-
-
-def test_slug_shortcut_via_slug_string(id_ws):
-    expr = CallExpr(name="slug", args=(LiteralExpr(value="alpha"),))
-    assert eval_value_expr(expr, _ctx(id_ws)) == "alpha"
+@pytest.mark.parametrize(
+    "name,hint_fragment",
+    [
+        ("id", 'field(resolve(v, "id"), "id")'),
+        ("uuid", 'field(resolve(v, "uuid"), "uuid")'),
+        ("slug", 'field(resolve(v, "slug"), "slug")'),
+        ("path", 'resolve(v, "path")'),
+    ],
+)
+def test_removed_shortcut_raises_with_hint(id_ws, name, hint_fragment):
+    expr = CallExpr(name=name, args=(LiteralExpr(value=1),))
+    with pytest.raises(CypherError) as exc:
+        eval_value_expr(expr, _ctx(id_ws))
+    msg = str(exc.value)
+    assert "was removed" in msg
+    assert hint_fragment in msg
 
 
 def test_id_to_slug_via_compose(id_ws):
