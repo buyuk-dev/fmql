@@ -1,10 +1,10 @@
 ---
 id: 0017
 title: Frontmatter documents — JSON / YAML serialization and deserialization
-status: todo
+status: done
 priority: 1
 created: 2026-04-19
-updated: 2026-04-19
+updated: 2026-05-03
 tags: [cli, frontmatter, serialization, interop]
 depends_on: []
 github_issue: https://github.com/buyuk-dev/fmql/issues/10

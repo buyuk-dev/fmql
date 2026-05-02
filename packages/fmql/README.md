@@ -111,8 +111,10 @@ Official plugins live alongside core in the [fmql monorepo](https://github.com/b
 | `search` | Run a search backend against a workspace/index | `fmql search 'alice' -w ./project` |
 | `index` | Build an index for an indexed backend | `fmql index --backend semantic -w ./project --out ./project/.fmql/semantic` |
 | `list-backends` | Enumerate discovered search backends | `fmql list-backends` |
+| `serialize` | Emit a single document as `{header, body}` JSON or YAML | `fmql serialize notes/today.md --format json` |
+| `deserialize` | Reconstruct markdown from `{header, body}` on stdin | `cat doc.json \| fmql deserialize --format json > notes/today.md` |
 
-Every command takes `--workspace/-w ROOT` (default: cwd). There are no longer any `set / append / remove / rename / toggle` commands — bulk edits go through `fmql update` with a Cypher pattern (see [Editing via update](#editing-via-update)).
+Workspace commands (`query`, `describe`, `update`, `subgraph`, `search`, `index`) take `--workspace/-w ROOT` (default: cwd). `serialize` / `deserialize` operate on a single document and take no workspace flag. There are no longer any `set / append / remove / rename / toggle` commands — bulk edits go through `fmql update` with a Cypher pattern (see [Editing via update](#editing-via-update)).
 
 Common flags:
 
@@ -445,6 +447,41 @@ plan.apply(confirm=False)   # write
 **Safety model.** Bulk edits print a unified diff and prompt before writing. `--dry-run` shows the diff without writing; `--yes` skips the prompt. The prompt reopens `/dev/tty` so it survives output redirection — on systems without a tty (CI, containers), pass `--yes`.
 
 **Formatting.** fmql re-emits edited YAML with 2-space mapping indent and 4-space sequence offset (ruamel defaults with explicit offset). Files that don't conform can still be parsed; only edited files are re-emitted, and untouched keys round-trip byte-for-byte.
+
+## Document JSON / YAML I/O
+
+`fmql serialize` and `fmql deserialize` round-trip a single markdown-with-frontmatter document through a canonical `{header, body}` shape — useful for piping into other tools, generating documents programmatically, or embedding fmql output in a larger data pipeline.
+
+```bash
+fmql serialize notes/today.md --format json
+```
+
+```json
+{
+  "header": { "title": "Today", "tags": ["inbox"] },
+  "body": "# Today\n\nSome notes...\n"
+}
+```
+
+`--format yaml` emits the same shape as YAML (with the body as a `|` block scalar). `deserialize` reads the structured form on stdin and writes markdown to stdout:
+
+```bash
+cat doc.json | fmql deserialize --format json > notes/today.md
+```
+
+`header` semantics on `deserialize`:
+
+| Input                    | Resulting markdown                          |
+|--------------------------|---------------------------------------------|
+| `header` absent / `null` | No fence pair — emits raw markdown body     |
+| `header: {}` (empty map) | Empty fence pair `---\n---\n`               |
+| `header: { ... }`        | Fence pair with serialized YAML             |
+
+Round-trip fidelity:
+
+- **YAML round-trip** is byte-identical for canonical inputs (LF endings, no BOM, simple scalars, dates, lists, nested maps).
+- **JSON round-trip** preserves frontmatter keys, ordering, and body content. JSON has no native date type, so `due: 2026-04-10` survives as the ISO string `"2026-04-10"` and re-emits as a quoted YAML string on `deserialize` rather than a bare YAML date.
+- **CRLF line endings, BOM, and EOF-newline absence** are not expressible in the structured form and are normalized to LF / absent / present on the way back. If you need byte-exact round-trip, use the Python `parse → serialize` API on the file directly (see [Use fmql as a frontmatter parser](#use-fmql-as-a-frontmatter-parser)).
 
 ## Writing a search backend
 

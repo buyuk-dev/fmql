@@ -2,7 +2,7 @@
 
 A snapshot of in-flight and queued work. The source of truth is `docs/tasks/` — this file is regenerated from it. Run `fmql query 'MATCH (t) RETURN t.id, t.title, t.status, t.priority, t.phase ORDER BY t.priority, t.id' -w docs/tasks --format rows` to refresh.
 
-Last updated: 2026-05-02.
+Last updated: 2026-05-03.
 
 ## Phase: cypher (the query language)
 
@@ -22,7 +22,7 @@ Last updated: 2026-05-02.
 | ID | Status | P | Title |
 |---|---|---|---|
 | [0002](tasks/0002-fmql-set-list-and-dict-values.md) | done | 1 | `fmql set` / append support for list and dict values |
-| [0017](tasks/0017-frontmatter-document-serialization.md) | todo | 1 | Frontmatter documents — JSON / YAML (de)serialization |
+| [0017](tasks/0017-frontmatter-document-serialization.md) | done | 1 | Frontmatter documents — JSON / YAML (de)serialization |
 | [0005](tasks/0005-output-format-labels-disambiguation.md) | todo | 2 | Disambiguate `--format json` (NDJSON vs JSON-array) |
 | [0018](tasks/0018-subgraph-mermaid-format.md) | todo | 2 | Mermaid output format for `fmql subgraph` |
 | [0023](tasks/0023-expose-parser-api-at-top-level.md) | done | 2 | Expose the frontmatter parser API at the top level |

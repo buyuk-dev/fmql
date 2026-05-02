@@ -1,35 +1,40 @@
 ---
-session_id: a8c83712-8a5d-442c-a205-77eec2e847b5
-task_id: 23
-branch: feature/expose-parser-api-at-top-level
+session_id: d4e3c0ea-cb4a-4ac9-819f-96daf890dd75
+task_id: 17
+branch: feature/frontmatter-document-serialization
 phase: done
-started: '2026-05-02T12:02:00Z'
+started: '2026-05-02T22:15:30Z'
 ---
 # Status
 
-Task **0023 — Expose the frontmatter parser API at the top level of the `fmql` package** finalized.
+Task **0017 — Frontmatter documents — JSON / YAML serialization and deserialization** finalized.
 
-Branch: `feature/expose-parser-api-at-top-level`. Plan: `~/.claude/plans/get-started-on-task-humming-blossom.md`.
+Branch: `feature/frontmatter-document-serialization`. Plan: `~/.claude/plans/get-started-on-task-fancy-rivest.md`.
 
 ## Outcome
 
-- **`packages/fmql/src/fmql/parser.py`**: made `pid` optional on both public entry points and added the docstrings the task called out as missing. `parse(text, *, abspath, pid=None)` and `parse_file(path, *, pid=None)` now default `pid` to `abspath.as_posix()` / `path.as_posix()` when omitted, so the standalone use case is `parse_file(Path("note.md"))` with zero ceremony. `abspath` stays required on `parse(text)` — `Packet.abspath: Path` is non-optional and synthesizing fake paths is task 0024 territory. The defaulting rule lives in one place: `parse` resolves it; `parse_file` just forwards `pid=pid`.
-- **`packages/fmql/src/fmql/__init__.py`**: re-exported `parse`, `parse_file`, and `serialize` (alias for `serialize_packet`) and added all three to `__all__`. `fmql.parser.serialize_packet` stays importable for existing callers (`edits.py:182`, `tests/test_parser_serialize.py:7`); only the shorter alias gets promoted to the front door.
-- **`Packet.serialize()`** (`packet.py:27`) untouched — its local import of `serialize_packet` keeps working.
-- **README.md**: new "Use fmql as a frontmatter parser" subsection between the Python quickstart and `## Features`. Three-line example (open file, mutate `frontmatter`, write back) plus a one-line note about lossless round-tripping. Targets the half of the audience that just wants a `python-frontmatter` replacement.
-- **Tests** (`packages/fmql/tests/test_public_api.py`, new): 8 cases pinning the public surface — `__all__` membership, `serialize is fmql.parser.serialize_packet` alias identity, `pid` defaults on both entry points, explicit-`pid` overrides, byte-exact round-trip via the alias on a real fixture, and a parse-mutate-serialize standalone flow.
-- **ADR** (`docs/decisions/0009-parser-public-surface-shape.md`): captures the three judgment calls — alias vs rename for `serialize_packet`, why `pid` defaults from the path while `abspath` stays required, and why only the alias appears in `__all__`. Rationale, consequences, and alternatives considered (including the deferred "abspath-less parsing" case).
-- **Workflow housekeeping**: archived prior STATUS body to `docs/changelog/0007.md`; flipped task 0023 to `done`; updated `docs/roadmap.md`.
+- **`packages/fmql/src/fmql/document_io.py`** (new): library helpers for round-tripping a `Packet` through a structured `{header, body}` shape — `to_obj` / `to_json` / `to_yaml` and `from_obj` / `from_json` / `from_yaml`, plus the two thin orchestrators `serialize_packet_to(packet, fmt=...)` and `deserialize_to_markdown(text, fmt=...)` the CLI calls. A local `SerializeFormat(str, Enum)` flows through both library and CLI so the format is type-checked end-to-end. Multi-line `body` emits as a YAML literal block scalar (`|`) so generated YAML stays human-readable; empty body falls through to a plain scalar. Validation errors raise `FmqlError`; YAML/JSON parse errors raise `ParseError`.
+- **`packages/fmql/src/fmql/cli/cmd_serialize.py`** (new): `serialize_cmd(path, fmt)` and `deserialize_cmd(fmt)`. The first takes a single path argument; the second reads stdin. Both default `--format` to `json`. Errors print `error: <msg>` to stderr and exit 2 — same pattern as `cmd_describe` / `cmd_subgraph`.
+- **`packages/fmql/src/fmql/cli/main.py`**: registered both commands.
+- **README** (`packages/fmql/README.md`): added `serialize` / `deserialize` rows to the CLI reference table, updated the "every command takes `--workspace`" note to call out the two non-workspace commands explicitly, and added a dedicated "Document JSON / YAML I/O" section with the canonical shape, tri-state `header` semantics table, and round-trip fidelity caveats.
+- **ADR** (`docs/decisions/0010-document-io-shape-and-semantics.md`): captures the four judgment calls — tri-state `header` (absent / `null` → no fence; `{}` → empty fence pair; mapping → fenced YAML); `fmql.document_io` stays library-internal (CLI is the documented surface); asymmetric file-in / stdin-out I/O matching the task examples; LF-only emit on `deserialize`. Rationale, consequences, and alternatives considered.
+- **Tests** (43 new):
+  - `packages/fmql/tests/test_document_io.py` (new, 25 cases): `to_obj` / `to_json` / `to_yaml` shape, `from_obj` validation errors, byte-identical YAML round-trip on a canonical fixture (string scalar, int, bool, ISO date, list, nested map), JSON round-trip preserving keys + ordering + body, edge cases (no frontmatter, empty body, empty fence pair, null header), and the documented JSON-loses-date-type lossy direction.
+  - `packages/fmql/tests/cli/test_serialize_cmd.py` (new, 6 cases): both formats, no-frontmatter case, missing-file and invalid-YAML error paths, all non-string scalar types in the JSON output.
+  - `packages/fmql/tests/cli/test_deserialize_cmd.py` (new, 12 cases): both formats, all three `header` shapes (absent, `{}`, mapping), YAML byte-identical round-trip, validation errors (non-mapping root, bad header type, bad body type, unknown keys), invalid-input error paths.
+- **Workflow housekeeping**: archived prior STATUS body to `docs/changelog/0008.md`; flipped task 0017 to `done`; updated `docs/roadmap.md`.
 
 ## Verification
 
-- `make format` — reformatted one file (`tests/test_public_api.py`); rerun clean.
-- `make lint` — failed once on `I001` (ruff wanted the aliased `serialize_packet as serialize` import on its own line, not chained with `parse, parse_file`); split the import line and re-ran clean.
-- `make test` — `fmql` 548 passed (was 540; +8 from the new `test_public_api.py`), `fmql-semantic` 56 passed.
+- `make format` — reformatted four files (`document_io.py`, `cmd_serialize.py`, `cli/main.py`, `tests/test_document_io.py`, `tests/cli/test_deserialize_cmd.py`) on first pass; rerun clean.
+- `make lint` — clean first run.
+- `make test` — `fmql` 591 passed (was 548; +43 from the three new test files), `fmql-semantic` 56 passed.
 
 ## Notes
 
-- **`pid` default is now part of the stable surface.** `parse_file(p).id == p.as_posix()` and `parse(t, abspath=p).id == p.as_posix()` are pinned by tests. Changing the default later (e.g. to `p.name`) would be a breaking change; the docstrings name the rule explicitly.
-- **Single source of truth for the defaulting rule.** Initial draft duplicated the `pid if pid is not None else …` expression in both `parse` and `parse_file`. The simplify pass collapsed it: `parse_file` now passes `pid=pid` straight through, `parse` is the only place the fallback lives.
-- **Ruff vs the consolidated import.** Tried `from fmql.parser import parse, parse_file, serialize_packet as serialize` to keep the re-export concise; ruff's `I001` rejects mixing aliased and non-aliased names in one statement and won't auto-fix to a form that satisfies both. The two-line split is the canonical form here.
-- **Coordinates with task [0024](docs/tasks/0024-rename-packet-type.md).** When `Packet` becomes `Document`, the top-level `serialize` alias absorbs the rename: `fmql.serialize` keeps its name, and `serialize_packet` would either become `serialize_document` or be kept as a deprecated re-export. The alias is the sidestep the task notes called out.
+- **`SerializeFormat` lives in `document_io.py`, not in the CLI module.** The library is the source of truth for the format choice; the CLI imports the enum and passes it through. Avoids stringly-typed `fmt: str` at the library boundary and avoids the CLI-importing-CLI dance you'd get if the enum lived in `cmd_serialize.py`.
+- **`_to_commented` is a no-op for already-`CommentedMap`/`CommentedSeq` values.** When `from_yaml` loads a `CommentedMap` from `_IO_YAML.load`, the nested values keep their source style metadata (block vs flow, quote style) instead of being copied into fresh containers with default styling. Cuts a redundant deep-copy on YAML deserialize and incidentally lets flow-style structured-form YAML survive the round-trip.
+- **`from_obj` accepts `CommentedMap` directly because it's a `dict` subclass.** `from_yaml` no longer pre-converts via `_to_plain` before handing off — the validation `isinstance(obj, dict)` check passes for both plain dicts (from JSON) and CommentedMaps (from YAML).
+- **`document_io._IO_YAML` is a separate ruamel instance from `parser._YAML`.** Configured identically today, but the duplication insulates structured I/O from incidental changes to the parser's YAML configuration. The ADR walks through the rationale.
+- **The structured form is not byte-exact for everything.** YAML round-trip is byte-identical for canonical inputs (LF, no BOM, simple scalars, dates, lists, nested maps). JSON loses YAML-specific metadata not expressible in JSON: original quote style on untouched fields, scalar type for `date`/`datetime` (ISO string round-tripping back as a quoted string, not a bare YAML date). CRLF, BOM, EOF-newline-absence are normalized away by both formats. Documented in the README and ADR; users needing byte-exact archival round-trip have the Python `parse → serialize` API.
+- **No `--workspace` flag on either command.** They operate on a single document — `serialize` takes a path, `deserialize` reads stdin. Symmetric stdin/file modes were considered and deferred (ADR 0010); the asymmetric shape matches the two task examples exactly.

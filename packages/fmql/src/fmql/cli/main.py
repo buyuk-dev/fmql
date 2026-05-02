@@ -6,6 +6,7 @@ from fmql import __version__
 from fmql.cli.cmd_describe import describe_cmd
 from fmql.cli.cmd_index import index_cmd, list_backends_cmd, search_cmd
 from fmql.cli.cmd_query import query_cmd
+from fmql.cli.cmd_serialize import deserialize_cmd, serialize_cmd
 from fmql.cli.cmd_subgraph import subgraph_cmd
 from fmql.cli.cmd_update import update_cmd
 
@@ -24,6 +25,10 @@ app.command(name="subgraph", help="Collect a reachability subgraph around seeds.
 app.command(name="search", help="Search a workspace or index.")(search_cmd)
 app.command(name="index", help="Build a search index for a workspace.")(index_cmd)
 app.command(name="list-backends", help="List discovered search backends.")(list_backends_cmd)
+app.command(name="serialize", help="Serialize a frontmatter document to JSON/YAML.")(serialize_cmd)
+app.command(name="deserialize", help="Reconstruct a frontmatter document from JSON/YAML on stdin.")(
+    deserialize_cmd
+)
 
 
 @app.command(name="version", help="Print fmql version and exit.")
