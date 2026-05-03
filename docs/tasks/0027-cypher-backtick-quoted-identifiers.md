@@ -1,7 +1,7 @@
 ---
 id: 0027
 title: Backtick-quoted identifiers for hyphenated frontmatter keys (`t.\`org-type\``)
-status: todo
+status: done
 priority: 2
 created: 2026-05-03
 updated: 2026-05-03

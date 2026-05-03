@@ -354,7 +354,7 @@ class _Compiler(Transformer):
 
     @v_args(inline=True)
     def r_field(self, var_ident, field_ident):
-        return ReturnField(var=str(var_ident), field=str(field_ident))
+        return ReturnField(var=str(var_ident), field=_ident_value(field_ident))
 
     @v_args(inline=True)
     def r_var(self, ident):
@@ -391,7 +391,7 @@ class _Compiler(Transformer):
         return str(tok)
 
     def qualified_ident(self, children):
-        idents = [str(c) for c in children if _is_ident(c)]
+        idents = [_ident_value(c) for c in children if _is_field_or_ident(c)]
         if len(idents) == 1:
             return idents[0]
         return f"{idents[0]}.{idents[1]}"
@@ -463,6 +463,15 @@ def _to_value_expr(obj: Any) -> ValueExpr:
 
 def _is_ident(obj: Any) -> bool:
     return isinstance(obj, Token) and obj.type == "IDENT"
+
+
+def _is_field_or_ident(obj: Any) -> bool:
+    return isinstance(obj, Token) and obj.type in ("IDENT", "BACKTICK_IDENT")
+
+
+def _ident_value(tok: Token) -> str:
+    s = str(tok)
+    return s[1:-1] if tok.type == "BACKTICK_IDENT" else s
 
 
 def _is_kw_token(obj: Any) -> bool:

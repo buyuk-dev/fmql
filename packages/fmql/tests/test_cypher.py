@@ -818,3 +818,150 @@ def test_exec_where_today_sentinel(project_pm_ws):
         if isinstance(p.as_plain().get("due_date"), date) and p.as_plain().get("due_date") < today_d
     }
     assert pids == expected
+
+
+# ---------- backtick-quoted field names ----------
+
+
+def test_parse_backtick_field_equals_bare():
+    bare = parse_cypher("MATCH (t) WHERE t.status = 1 RETURN t")
+    ticked = parse_cypher("MATCH (t) WHERE t.`status` = 1 RETURN t")
+    assert bare == ticked
+
+
+def test_parse_backtick_return_field_equals_bare():
+    bare = parse_cypher("MATCH (t) RETURN t.status")
+    ticked = parse_cypher("MATCH (t) RETURN t.`status`")
+    assert bare == ticked
+
+
+def test_parse_backtick_set_remove_order_equal_bare():
+    bare = parse_cypher(
+        'MATCH (t) WHERE t.status = "old" SET t.status = "new" REMOVE t.draft '
+        "RETURN t ORDER BY t.priority DESC"
+    )
+    ticked = parse_cypher(
+        'MATCH (t) WHERE t.`status` = "old" SET t.`status` = "new" REMOVE t.`draft` '
+        "RETURN t ORDER BY t.`priority` DESC"
+    )
+    assert bare == ticked
+
+
+@pytest.fixture
+def hyphen_ws(make_workspace):
+    spec = {
+        "a.md": {"frontmatter": {"uuid": "a", "org-type": "school", "status": "active"}},
+        "b.md": {"frontmatter": {"uuid": "b", "org-type": "company", "status": "active"}},
+        "c.md": {"frontmatter": {"uuid": "c", "org-type": "vendor", "status": "done"}},
+        "d.md": {"frontmatter": {"uuid": "d", "status": "active"}},
+    }
+    return make_workspace(spec)
+
+
+def test_exec_where_backtick_eq(hyphen_ws):
+    res = compile_cypher('MATCH (t) WHERE t.`org-type` = "school" RETURN t', hyphen_ws)
+    assert {row[0] for row in res.rows} == {"a.md"}
+
+
+def test_exec_where_backtick_in_list(hyphen_ws):
+    res = compile_cypher(
+        'MATCH (t) WHERE t.`org-type` IN ["school", "company"] RETURN t', hyphen_ws
+    )
+    assert {row[0] for row in res.rows} == {"a.md", "b.md"}
+
+
+def test_exec_where_backtick_is_null(hyphen_ws):
+    res = compile_cypher("MATCH (t) WHERE t.`org-type` IS NULL RETURN t", hyphen_ws)
+    assert {row[0] for row in res.rows} == {"d.md"}
+
+
+def test_exec_where_backtick_contains(hyphen_ws):
+    res = compile_cypher('MATCH (t) WHERE t.`org-type` CONTAINS "ven" RETURN t', hyphen_ws)
+    assert {row[0] for row in res.rows} == {"c.md"}
+
+
+def test_exec_where_mixed_backtick_and_bare(hyphen_ws):
+    res = compile_cypher(
+        'MATCH (t) WHERE t.`org-type` = "school" AND t.status = "active" RETURN t',
+        hyphen_ws,
+    )
+    assert {row[0] for row in res.rows} == {"a.md"}
+
+
+def test_exec_return_backtick_column_header(hyphen_ws):
+    res = compile_cypher("MATCH (t) RETURN t.`org-type`", hyphen_ws)
+    assert res.columns == ("t.org-type",)
+    values = {row[0] for row in res.rows}
+    assert values == {"school", "company", "vendor", None}
+
+
+def test_exec_order_by_backtick(hyphen_ws):
+    res = compile_cypher("MATCH (t) RETURN t.uuid ORDER BY t.`org-type` ASC NULLS LAST", hyphen_ws)
+    uuids = [row[0] for row in res.rows]
+    # alphabetical: company, school, vendor, then null (d.md) last
+    assert uuids[:3] == ["b", "a", "c"]
+    assert uuids[3] == "d"
+
+
+def test_exec_backtick_field_with_dots_in_name(make_workspace):
+    ws = make_workspace(
+        {
+            "a.md": {"frontmatter": {"a.b.c": "yes"}},
+            "b.md": {"frontmatter": {"a.b.c": "no"}},
+        }
+    )
+    res = compile_cypher('MATCH (t) WHERE t.`a.b.c` = "yes" RETURN t.`a.b.c`', ws)
+    assert res.columns == ("t.a.b.c",)
+    assert [row[0] for row in res.rows] == ["yes"]
+
+
+def test_exec_backtick_field_with_space_in_name(make_workspace):
+    ws = make_workspace(
+        {
+            "a.md": {"frontmatter": {"last modified": "2026-05-01"}},
+            "b.md": {"frontmatter": {"last modified": "2026-05-02"}},
+        }
+    )
+    res = compile_cypher('MATCH (t) WHERE t.`last modified` = "2026-05-01" RETURN t', ws)
+    assert {row[0] for row in res.rows} == {"a.md"}
+
+
+def test_exec_backtick_field_with_unicode_name(make_workspace):
+    ws = make_workspace(
+        {
+            "a.md": {"frontmatter": {"日本語": "yes"}},
+            "b.md": {"frontmatter": {"日本語": "no"}},
+        }
+    )
+    res = compile_cypher('MATCH (t) WHERE t.`日本語` = "yes" RETURN t', ws)
+    assert {row[0] for row in res.rows} == {"a.md"}
+
+
+@pytest.mark.parametrize(
+    "txt",
+    [
+        # empty backticks
+        "MATCH (t) WHERE t.`` = 1 RETURN t",
+        # unterminated backtick
+        "MATCH (t) WHERE t.`org-type = 1 RETURN t",
+        # embedded literal backtick — Cypher's `` escape is not supported in fmql v1
+        "MATCH (t) WHERE t.`a``b` = 1 RETURN t",
+        # backtick on pattern variable
+        "MATCH (`t`) RETURN t",
+        # backtick on label
+        "MATCH (t:`Label`) RETURN t",
+        # backtick on relationship type
+        "MATCH (a)-[:`rel-type`]->(b) RETURN a",
+        # backtick on function name
+        "MATCH (t) SET t.x = `resolve`(t.x)",
+        # backtick on list-comprehension binding
+        "MATCH (t) SET t.x = [`y` IN t.list | y]",
+        # backtick on RETURN variable (not after a dot)
+        "MATCH (t) RETURN `t`",
+        # backtick on COUNT argument
+        "MATCH (t) RETURN count(`t`)",
+    ],
+)
+def test_backtick_disallowed_positions_raise(txt):
+    with pytest.raises(CypherError):
+        parse_cypher(txt)

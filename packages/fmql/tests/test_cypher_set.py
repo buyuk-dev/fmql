@@ -406,3 +406,90 @@ def test_parse_not_binds_tighter_than_plus():
     assert isinstance(item.expr, BinaryOp)
     assert isinstance(item.expr.left, UnaryOp)
     assert item.expr.left.op == "not"
+
+
+# ---------- backtick-quoted field names ----------
+
+
+@pytest.fixture
+def hyphen_set_ws(make_workspace):
+    spec = {
+        "tasks/a.md": {
+            "frontmatter": {
+                "uuid": "a",
+                "org-type": "old",
+                "tags": ["x"],
+                "first-name": "Ada",
+                "last-name": "Lovelace",
+            },
+            "body": "a\n",
+        },
+        "tasks/b.md": {
+            "frontmatter": {
+                "uuid": "b",
+                "org-type": "old",
+                "first-name": "Linus",
+                "last-name": "Torvalds",
+            },
+            "body": "b\n",
+        },
+    }
+    return make_workspace(spec)
+
+
+def test_set_backtick_field_writes_file(hyphen_set_ws):
+    ast = parse_cypher('MATCH (t) SET t.`org-type` = "vendor"')
+    execution = compile_cypher_ast(ast, hyphen_set_ws)
+    report = execution.plan.apply(confirm=False)
+    assert sorted(report.written) == ["tasks/a.md", "tasks/b.md"]
+    a = hyphen_set_ws.packets["tasks/a.md"].as_plain()
+    assert a["org-type"] == "vendor"
+    b = hyphen_set_ws.packets["tasks/b.md"].as_plain()
+    assert b["org-type"] == "vendor"
+
+
+def test_set_backtick_plus_eq_appends(hyphen_set_ws):
+    ast = parse_cypher('MATCH (t) WHERE t.uuid = "a" SET t.`tags` += "y"')
+    execution = compile_cypher_ast(ast, hyphen_set_ws)
+    execution.plan.apply(confirm=False)
+    a = hyphen_set_ws.packets["tasks/a.md"].as_plain()
+    assert list(a["tags"]) == ["x", "y"]
+
+
+def test_set_backtick_plus_eq_parses_same_as_bare():
+    """`SET t.`tags` += "x"` and `SET t.tags += "x"` produce identical SetItems."""
+    from fmql.cypher.ast import LiteralExpr, SetItem
+
+    bare = parse_cypher('MATCH (t) SET t.tags += "x"')
+    ticked = parse_cypher('MATCH (t) SET t.`tags` += "x"')
+    assert bare.set_items == ticked.set_items
+    assert bare.set_items == (
+        SetItem(var="t", field="tags", expr=LiteralExpr(value="x"), op="append"),
+    )
+
+
+def test_set_backtick_binary_plus_concat(hyphen_set_ws):
+    """Backtick operands flow through binary + the same as bare idents."""
+    ast = parse_cypher('MATCH (t) SET t.`display-name` = t.`first-name` + " " + t.`last-name`')
+    execution = compile_cypher_ast(ast, hyphen_set_ws)
+    execution.plan.apply(confirm=False)
+    a = hyphen_set_ws.packets["tasks/a.md"].as_plain()
+    assert a["display-name"] == "Ada Lovelace"
+    b = hyphen_set_ws.packets["tasks/b.md"].as_plain()
+    assert b["display-name"] == "Linus Torvalds"
+
+
+def test_set_backtick_validator_no_undeclared_var_complaint(hyphen_set_ws):
+    """Pin: backticked field on both sides round-trips through validator."""
+    ast = parse_cypher('MATCH (t) SET t.`org-type` = t.`org-type` + "_v2"')
+    execution = compile_cypher_ast(ast, hyphen_set_ws)  # must not raise
+    execution.plan.apply(confirm=False)
+    a = hyphen_set_ws.packets["tasks/a.md"].as_plain()
+    assert a["org-type"] == "old_v2"
+
+
+def test_set_backtick_pseudo_field_still_rejected(hyphen_set_ws):
+    """Backtick-escaping `_id` does not bypass the pseudo-field reject."""
+    ast = parse_cypher('MATCH (t) SET t.`_id` = "x"')
+    with pytest.raises(CypherError):
+        compile_cypher_ast(ast, hyphen_set_ws)

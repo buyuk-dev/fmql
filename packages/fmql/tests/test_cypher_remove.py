@@ -68,3 +68,38 @@ def test_remove_only_no_return_no_set_is_valid(flagged_ws):
     exec = compile_cypher_ast(ast, flagged_ws)
     assert exec.plan is not None
     assert exec.result is None
+
+
+# ---------- backtick-quoted field names ----------
+
+
+@pytest.fixture
+def hyphen_remove_ws(make_workspace):
+    spec = {
+        "a.md": {
+            "frontmatter": {"uuid": "a", "org-type": "school", "status": "active"},
+            "body": "a\n",
+        },
+        "b.md": {
+            "frontmatter": {"uuid": "b", "org-type": "company", "status": "active"},
+            "body": "b\n",
+        },
+    }
+    return make_workspace(spec)
+
+
+def test_remove_backtick_drops_hyphenated_key(hyphen_remove_ws):
+    ast = parse_cypher("MATCH (t) REMOVE t.`org-type`")
+    plan = compile_cypher_ast(ast, hyphen_remove_ws).plan
+    plan.apply(confirm=False)
+    for pid in ("a.md", "b.md"):
+        body = hyphen_remove_ws.packets[pid].as_plain()
+        assert "org-type" not in body
+        assert body["status"] == "active"  # untouched
+
+
+def test_remove_backtick_pseudo_field_still_rejected(hyphen_remove_ws):
+    """Backtick-escaping `_path` does not bypass the pseudo-field reject on REMOVE."""
+    ast = parse_cypher("MATCH (t) REMOVE t.`_path`")
+    with pytest.raises(CypherError):
+        compile_cypher_ast(ast, hyphen_remove_ws)

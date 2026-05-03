@@ -186,9 +186,12 @@ fmql query 'MATCH (t) WHERE t.assigned_to NOT IN [null, "alice"] RETURN t' -w ./
 fmql query 'MATCH (t) WHERE t.assigned_to IS NOT NULL RETURN t' -w ./project
 fmql query 'MATCH (t) WHERE NOT (t.assigned_to IS EMPTY) RETURN t' -w ./project
 fmql query 'MATCH (t) WHERE t.title MATCHES "^\\[WIP\\]" RETURN t' -w ./project
+fmql query 'MATCH (t) WHERE t.`org-type` = "school" RETURN t' -w ./project
 fmql query 'MATCH (a)-[:blocked_by*]->(a) RETURN a' -w ./project
 fmql query 'MATCH (a)-[:belongs_to]->(e) WHERE e.type = "epic" RETURN a, e' -w ./project
 ```
+
+Frontmatter keys with hyphens, dots, spaces, or other non-`[A-Za-z0-9_]` characters can be backtick-escaped (matches Neo4j's escape syntax), e.g. `` t.`org-type` ``, `` t.`last modified` ``, `` t.`日本語` ``. Bare identifiers continue to work unchanged; backticks are an optional escape, never required, and apply only to the field-name slot after a `.`.
 
 ### Python kwargs API
 

@@ -57,7 +57,7 @@ nulls_spec: NULLS_KW FIRST_KW
 limit_clause: LIMIT_KW INT
 
 return_item: COUNT_KW "(" IDENT ")"          -> r_count
-           | IDENT "." IDENT                 -> r_field
+           | IDENT "." field_name            -> r_field
            | IDENT                           -> r_var
            | ESCAPED_STRING                  -> r_string
            | SIGNED_NUMBER                   -> r_number
@@ -80,7 +80,9 @@ predicate: qualified_ident cmp_op value                              -> p_binop
          | qualified_ident IS_KW NOT_KW NULL_KW                      -> p_not_null
          | qualified_ident IS_KW NULL_KW                             -> p_null
 
-qualified_ident: IDENT ("." IDENT)?
+qualified_ident: IDENT ("." field_name)?
+
+?field_name: IDENT | BACKTICK_IDENT
 
 cmp_op: EQ | NEQ | GTE | LTE | GT | LT | CONTAINS_KW | MATCHES_KW
 
@@ -130,6 +132,7 @@ GT: ">"
 LT: "<"
 
 IDENT.1: /[A-Za-z_][A-Za-z0-9_]*/
+BACKTICK_IDENT.2: /`[^`]+`/
 INT: /\d+/
 
 %import common.ESCAPED_STRING
