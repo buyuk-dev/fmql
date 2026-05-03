@@ -8,6 +8,7 @@ from lark import Lark, Token, Transformer, v_args
 from lark.exceptions import LarkError, VisitError
 
 from fmql.cypher.ast import (
+    BinaryOp,
     CallExpr,
     CypherAST,
     FieldRef,
@@ -258,6 +259,10 @@ class _Compiler(Transformer):
     def ve_not(self, _kw, expr):
         return UnaryOp(op="not", operand=_to_value_expr(expr))
 
+    @v_args(inline=True)
+    def ve_add(self, left, _plus, right):
+        return BinaryOp(op="add", left=_to_value_expr(left), right=_to_value_expr(right))
+
     def list_lit(self, children):
         items = tuple(_to_value_expr(c) for c in children if not _is_kw_token(c))
         return ListLit(items=items)
@@ -451,7 +456,7 @@ def _parse_number(text: str) -> int | float:
 
 
 def _to_value_expr(obj: Any) -> ValueExpr:
-    if isinstance(obj, (LiteralExpr, FieldRef, CallExpr, UnaryOp, ListLit, ListComp)):
+    if isinstance(obj, (LiteralExpr, FieldRef, CallExpr, UnaryOp, BinaryOp, ListLit, ListComp)):
         return obj
     return LiteralExpr(value=obj)
 

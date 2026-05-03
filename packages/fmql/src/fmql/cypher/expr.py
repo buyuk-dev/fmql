@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Callable, Optional
 
 from fmql.cypher.ast import (
+    BinaryOp,
     CallExpr,
     FieldRef,
     ListComp,
@@ -19,6 +20,11 @@ from fmql.query import AndNode, ExprNode, NotNode, OrNode, PredNode
 from fmql.resolvers import resolver_by_name
 from fmql.types import PacketId, Resolver
 from fmql.workspace import Workspace
+
+
+class BinaryOpError(CypherError):
+    """Raised when binary `+` operands have incompatible types."""
+
 
 Binding = dict[str, PacketId]
 
@@ -172,6 +178,12 @@ def eval_value_expr(expr: ValueExpr, ctx: EvalCtx) -> Any:
                 return [_negate(v) for v in value]
             return _negate(value)
         raise CypherError(f"unknown unary operator: {expr.op!r}")
+    if isinstance(expr, BinaryOp):
+        if expr.op == "add":
+            left = eval_value_expr(expr.left, ctx)
+            right = eval_value_expr(expr.right, ctx)
+            return _eval_add(left, right)
+        raise CypherError(f"unknown binary operator: {expr.op!r}")
     if isinstance(expr, ListLit):
         return [eval_value_expr(item, ctx) for item in expr.items]
     if isinstance(expr, ListComp):
@@ -206,6 +218,32 @@ def _negate(v: Any) -> Any:
     if not isinstance(v, bool):
         raise CypherError(f"NOT operand must be bool, got {type(v).__name__}")
     return not v
+
+
+def _is_list(v: Any) -> bool:
+    return isinstance(v, (list, tuple))
+
+
+def _is_number(v: Any) -> bool:
+    # bool is a subclass of int in Python; exclude it so `True + 1` errors
+    # rather than silently producing `2`.
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def _eval_add(left: Any, right: Any) -> Any:
+    if left is None or right is None:
+        return None
+    if _is_list(left) and _is_list(right):
+        return [*left, *right]
+    if _is_list(left):
+        return [*left, right]
+    if _is_list(right):
+        return [left, *right]
+    if isinstance(left, str) and isinstance(right, str):
+        return left + right
+    if _is_number(left) and _is_number(right):
+        return left + right
+    raise BinaryOpError(f"cannot add {type(left).__name__} and {type(right).__name__}")
 
 
 def eval_predicate(expr: ExprNode, ctx: EvalCtx) -> bool:

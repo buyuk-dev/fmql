@@ -5,6 +5,7 @@ from dataclasses import dataclass, replace
 from typing import Any, Optional
 
 from fmql.cypher.ast import (
+    BinaryOp,
     CallExpr,
     CypherAST,
     CypherResult,
@@ -28,6 +29,7 @@ from fmql.cypher.ast import (
 from fmql.cypher.compile import parse_cypher
 from fmql.cypher.expr import (
     PSEUDO_FIELDS,
+    BinaryOpError,
     EvalCtx,
     eval_predicate,
     eval_value_expr,
@@ -177,6 +179,10 @@ def _check_value_expr_vars(expr: ValueExpr, declared: set[str]) -> None:
     if isinstance(expr, UnaryOp):
         _check_value_expr_vars(expr.operand, declared)
         return
+    if isinstance(expr, BinaryOp):
+        _check_value_expr_vars(expr.left, declared)
+        _check_value_expr_vars(expr.right, declared)
+        return
     if isinstance(expr, ListLit):
         for item in expr.items:
             _check_value_expr_vars(item, declared)
@@ -288,6 +294,7 @@ def _build_edit_plan(
     appends: dict[PacketId, list[tuple[str, Any]]] = {}
     removes: dict[PacketId, list[str]] = {}
     field_kind: dict[tuple[PacketId, str], str] = {}
+    errors_by_pid: dict[PacketId, str] = {}
     order: list[PacketId] = []
     seen: set[PacketId] = set()
 
@@ -303,7 +310,14 @@ def _build_edit_plan(
                 continue
             touch(pid)
             ctx = EvalCtx(workspace=workspace, binding=binding, origin=pid)
-            value = eval_value_expr(item.expr, ctx)
+            try:
+                value = eval_value_expr(item.expr, ctx)
+            except BinaryOpError as e:
+                # First error wins; subsequent set/remove ops for this pid are
+                # dropped by the op-assembly loop below so the file gets no
+                # partial write — the error op short-circuits at apply time.
+                errors_by_pid.setdefault(pid, str(e))
+                continue
             kind = "append" if item.op == "append" else "set"
             key = (pid, item.field)
             existing = field_kind.get(key)
@@ -344,6 +358,9 @@ def _build_edit_plan(
 
     ops: list[EditOp] = []
     for pid in order:
+        if pid in errors_by_pid:
+            ops.append(EditOp(packet_id=pid, kind="error", args={"message": errors_by_pid[pid]}))
+            continue
         rm = removes.get(pid)
         if rm:
             ops.append(EditOp(packet_id=pid, kind="remove", args={"fields": list(rm)}))

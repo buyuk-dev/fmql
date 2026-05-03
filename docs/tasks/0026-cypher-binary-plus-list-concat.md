@@ -1,9 +1,11 @@
 ---
 id: 0026
 title: Add binary `+` to Cypher value expressions for Neo4j-portable list concatenation
-status: todo
+status: done
 priority: 2
 created: 2026-05-03
+started: 2026-05-03
+completed: 2026-05-03
 tags: [cypher, grammar, compatibility]
 depends_on: [0022]
 phase: cypher

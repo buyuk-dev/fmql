@@ -264,3 +264,145 @@ def test_remove_on_pseudo_field_rejected(make_workspace):
     ws = make_workspace({"docs/a.md": {"frontmatter": {"uuid": "a"}, "body": "a\n"}})
     with pytest.raises(CypherError, match="cannot REMOVE pseudo-field t._id"):
         compile_cypher_ast(parse_cypher("MATCH (t) REMOVE t._id"), ws)
+
+
+# -- binary `+` (task 0026) -------------------------------------------------
+
+
+def test_binary_plus_list_plus_list_extends(make_workspace):
+    """`list + list` extends — directly contrasts with `test_append_with_list_valued_rhs_nests`."""
+    spec = {
+        "a.md": {
+            "frontmatter": {"uuid": "a", "tags": ["one"], "extras": ["two", "three"]},
+            "body": "a\n",
+        }
+    }
+    ws = make_workspace(spec)
+    ast = parse_cypher("MATCH (t) SET t.tags = t.tags + t.extras")
+    compile_cypher_ast(ast, ws).plan.apply(confirm=False)
+    assert list(ws.packets["a.md"].as_plain()["tags"]) == ["one", "two", "three"]
+
+
+def test_binary_plus_list_plus_scalar_appends(make_workspace):
+    spec = {"a.md": {"frontmatter": {"uuid": "a", "tags": ["one", "two"]}, "body": "a\n"}}
+    ws = make_workspace(spec)
+    ast = parse_cypher('MATCH (t) SET t.tags = t.tags + "three"')
+    compile_cypher_ast(ast, ws).plan.apply(confirm=False)
+    assert list(ws.packets["a.md"].as_plain()["tags"]) == ["one", "two", "three"]
+
+
+def test_binary_plus_scalar_plus_list_prepends(make_workspace):
+    spec = {"a.md": {"frontmatter": {"uuid": "a", "tags": ["two", "three"]}, "body": "a\n"}}
+    ws = make_workspace(spec)
+    ast = parse_cypher('MATCH (t) SET t.tags = "one" + t.tags')
+    compile_cypher_ast(ast, ws).plan.apply(confirm=False)
+    assert list(ws.packets["a.md"].as_plain()["tags"]) == ["one", "two", "three"]
+
+
+def test_binary_plus_string_plus_string(make_workspace):
+    spec = {"a.md": {"frontmatter": {"uuid": "a", "title": "draft"}, "body": "a\n"}}
+    ws = make_workspace(spec)
+    ast = parse_cypher('MATCH (t) SET t.title = t.title + "_v2"')
+    compile_cypher_ast(ast, ws).plan.apply(confirm=False)
+    assert ws.packets["a.md"].as_plain()["title"] == "draft_v2"
+
+
+@pytest.mark.parametrize(
+    "expr,expected",
+    [
+        ("1 + 2", 3),
+        ("1 + 2.5", 3.5),
+        ("0.5 + 0.25", 0.75),
+    ],
+)
+def test_binary_plus_numbers(make_workspace, expr, expected):
+    spec = {"a.md": {"frontmatter": {"uuid": "a"}, "body": "a\n"}}
+    ws = make_workspace(spec)
+    ast = parse_cypher(f"MATCH (t) SET t.n = {expr}")
+    compile_cypher_ast(ast, ws).plan.apply(confirm=False)
+    assert ws.packets["a.md"].as_plain()["n"] == expected
+
+
+def test_binary_plus_mixed_type_is_per_packet_error(make_workspace):
+    """`"a" + 1` errors per packet; other packets succeed (mirrors `+=` non-list)."""
+    spec = {
+        "bad.md": {"frontmatter": {"uuid": "bad", "year": 2024}, "body": "bad\n"},
+        "good.md": {"frontmatter": {"uuid": "good", "year": "2024"}, "body": "good\n"},
+    }
+    ws = make_workspace(spec)
+    # year is int on bad.md, str on good.md — only the int packet errors.
+    ast = parse_cypher('MATCH (t) SET t.label = t.year + " summary"')
+    report = compile_cypher_ast(ast, ws).plan.apply(confirm=False)
+    assert report.errors == [("bad.md", "cannot add int and str")]
+    assert "good.md" in report.written
+    assert ws.packets["good.md"].as_plain()["label"] == "2024 summary"
+    assert "label" not in ws.packets["bad.md"].as_plain()
+
+
+def test_binary_plus_none_propagates(make_workspace):
+    """`None` on either side yields `None`; the field is set to YAML null."""
+    spec = {"a.md": {"frontmatter": {"uuid": "a"}, "body": "a\n"}}
+    ws = make_workspace(spec)
+    ast = parse_cypher('MATCH (t) SET t.x = t.missing + "suffix"')
+    compile_cypher_ast(ast, ws).plan.apply(confirm=False)
+    plain = ws.packets["a.md"].as_plain()
+    assert "x" in plain
+    assert plain["x"] is None
+
+
+def test_binary_plus_left_associative_chaining(make_workspace):
+    """`t.list + [1] + [2]` chains as `(t.list + [1]) + [2]`."""
+    spec = {"a.md": {"frontmatter": {"uuid": "a", "list": [0]}, "body": "a\n"}}
+    ws = make_workspace(spec)
+    ast = parse_cypher("MATCH (t) SET t.list = t.list + [1] + [2]")
+    compile_cypher_ast(ast, ws).plan.apply(confirm=False)
+    assert list(ws.packets["a.md"].as_plain()["list"]) == [0, 1, 2]
+
+
+def test_binary_plus_inside_list_lit(make_workspace):
+    spec = {"a.md": {"frontmatter": {"uuid": "a", "first": "alpha"}, "body": "a\n"}}
+    ws = make_workspace(spec)
+    ast = parse_cypher('MATCH (t) SET t.tags = [t.first + "_suffix", "literal"]')
+    compile_cypher_ast(ast, ws).plan.apply(confirm=False)
+    assert list(ws.packets["a.md"].as_plain()["tags"]) == ["alpha_suffix", "literal"]
+
+
+def test_binary_plus_inside_func_call(make_workspace):
+    """Operands carry through nested calls. `field(resolve(t.id + "_v2", "id"), "title")`
+    composes against an `id` resolver and a workspace where ids are versioned."""
+    from fmql.resolvers import IdResolver
+
+    spec = {
+        "a.md": {"frontmatter": {"id": "alpha_v2", "title": "Alpha v2"}, "body": "a\n"},
+        "b.md": {"frontmatter": {"id": "beta", "ref_id": "alpha"}, "body": "b\n"},
+    }
+    ws = make_workspace(spec)
+    ws.resolvers["ref_id"] = IdResolver()
+    ast = parse_cypher(
+        'MATCH (t) WHERE t.id = "beta" '
+        'SET t.referenced_title = field(resolve(t.ref_id + "_v2", "id"), "title")'
+    )
+    compile_cypher_ast(ast, ws).plan.apply(confirm=False)
+    assert ws.packets["b.md"].as_plain()["referenced_title"] == "Alpha v2"
+
+
+def test_parse_plus_eq_takes_precedence_over_plus():
+    """`SET t.f += t.g + "x"` parses as `t.f += (t.g + "x")`."""
+    from fmql.cypher.ast import BinaryOp
+
+    ast = parse_cypher('MATCH (t) SET t.f += t.g + "x"')
+    (item,) = ast.set_items
+    assert item.op == "append"
+    assert isinstance(item.expr, BinaryOp)
+    assert item.expr.op == "add"
+
+
+def test_parse_not_binds_tighter_than_plus():
+    """`NOT a + b` parses as `(NOT a) + b` — `NOT` is unary above `+`."""
+    from fmql.cypher.ast import BinaryOp, UnaryOp
+
+    ast = parse_cypher("MATCH (t) SET t.x = NOT t.flag + t.tail")
+    (item,) = ast.set_items
+    assert isinstance(item.expr, BinaryOp)
+    assert isinstance(item.expr.left, UnaryOp)
+    assert item.expr.left.op == "not"

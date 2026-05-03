@@ -81,6 +81,13 @@ class UnaryOp:
 
 
 @dataclass(frozen=True)
+class BinaryOp:
+    op: str
+    left: "ValueExpr"
+    right: "ValueExpr"
+
+
+@dataclass(frozen=True)
 class ListLit:
     items: tuple["ValueExpr", ...]
 
@@ -93,7 +100,7 @@ class ListComp:
     projection: Optional["ValueExpr"]
 
 
-ValueExpr = Union[LiteralExpr, FieldRef, CallExpr, UnaryOp, ListLit, ListComp]
+ValueExpr = Union[LiteralExpr, FieldRef, CallExpr, UnaryOp, BinaryOp, ListLit, ListComp]
 
 
 SetOp = Literal["set", "append"]

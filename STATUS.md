@@ -1,40 +1,38 @@
 ---
-session_id: d4e3c0ea-cb4a-4ac9-819f-96daf890dd75
-task_id: 17
-branch: feature/frontmatter-document-serialization
+session_id: 2e1fdda8-ef2f-4e75-8c88-7fe66194a9da
+task_id: 26
+branch: feature/cypher-binary-plus-list-concat
 phase: done
-started: '2026-05-02T22:15:30Z'
+started: '2026-05-03T21:05:40Z'
 ---
-# Status
+Task **0026 — Add binary `+` to Cypher value expressions for Neo4j-portable list concatenation** finalized.
 
-Task **0017 — Frontmatter documents — JSON / YAML serialization and deserialization** finalized.
-
-Branch: `feature/frontmatter-document-serialization`. Plan: `~/.claude/plans/get-started-on-task-fancy-rivest.md`.
+Branch: `feature/cypher-binary-plus-list-concat`. Plan: `~/.claude/plans/get-started-on-task-joyful-koala.md`.
 
 ## Outcome
 
-- **`packages/fmql/src/fmql/document_io.py`** (new): library helpers for round-tripping a `Packet` through a structured `{header, body}` shape — `to_obj` / `to_json` / `to_yaml` and `from_obj` / `from_json` / `from_yaml`, plus the two thin orchestrators `serialize_packet_to(packet, fmt=...)` and `deserialize_to_markdown(text, fmt=...)` the CLI calls. A local `SerializeFormat(str, Enum)` flows through both library and CLI so the format is type-checked end-to-end. Multi-line `body` emits as a YAML literal block scalar (`|`) so generated YAML stays human-readable; empty body falls through to a plain scalar. Validation errors raise `FmqlError`; YAML/JSON parse errors raise `ParseError`.
-- **`packages/fmql/src/fmql/cli/cmd_serialize.py`** (new): `serialize_cmd(path, fmt)` and `deserialize_cmd(fmt)`. The first takes a single path argument; the second reads stdin. Both default `--format` to `json`. Errors print `error: <msg>` to stderr and exit 2 — same pattern as `cmd_describe` / `cmd_subgraph`.
-- **`packages/fmql/src/fmql/cli/main.py`**: registered both commands.
-- **README** (`packages/fmql/README.md`): added `serialize` / `deserialize` rows to the CLI reference table, updated the "every command takes `--workspace`" note to call out the two non-workspace commands explicitly, and added a dedicated "Document JSON / YAML I/O" section with the canonical shape, tri-state `header` semantics table, and round-trip fidelity caveats.
-- **ADR** (`docs/decisions/0010-document-io-shape-and-semantics.md`): captures the four judgment calls — tri-state `header` (absent / `null` → no fence; `{}` → empty fence pair; mapping → fenced YAML); `fmql.document_io` stays library-internal (CLI is the documented surface); asymmetric file-in / stdin-out I/O matching the task examples; LF-only emit on `deserialize`. Rationale, consequences, and alternatives considered.
-- **Tests** (43 new):
-  - `packages/fmql/tests/test_document_io.py` (new, 25 cases): `to_obj` / `to_json` / `to_yaml` shape, `from_obj` validation errors, byte-identical YAML round-trip on a canonical fixture (string scalar, int, bool, ISO date, list, nested map), JSON round-trip preserving keys + ordering + body, edge cases (no frontmatter, empty body, empty fence pair, null header), and the documented JSON-loses-date-type lossy direction.
-  - `packages/fmql/tests/cli/test_serialize_cmd.py` (new, 6 cases): both formats, no-frontmatter case, missing-file and invalid-YAML error paths, all non-string scalar types in the JSON output.
-  - `packages/fmql/tests/cli/test_deserialize_cmd.py` (new, 12 cases): both formats, all three `header` shapes (absent, `{}`, mapping), YAML byte-identical round-trip, validation errors (non-mapping root, bad header type, bad body type, unknown keys), invalid-input error paths.
-- **Workflow housekeeping**: archived prior STATUS body to `docs/changelog/0008.md`; flipped task 0017 to `done`; updated `docs/roadmap.md`.
+- **`packages/fmql/src/fmql/cypher/grammar.lark`**: layered the value-expr grammar — `?value_expr: add_expr`, with `?add_expr: add_expr PLUS unary_expr` (left-associative) sitting above `?unary_expr` (which carries `NOT_KW`, `value_atom`, `func_call`, `list_lit`, `list_comp`). New `PLUS: "+"` token next to the existing `PLUS_EQ`; lark's longest-match lexer rule keeps `+=` consumed by `set_op` and `+` consumed by `add_expr` with no ambiguity.
+- **`packages/fmql/src/fmql/cypher/ast.py`**: new `BinaryOp(op, left, right)` frozen dataclass; extended the `ValueExpr` union to include it. Mirrors the pre-existing `UnaryOp` shape.
+- **`packages/fmql/src/fmql/cypher/compile.py`**: `ve_add` transformer builds the `BinaryOp(op="add", ...)` node from the three children lark hands it; extended `_to_value_expr`'s isinstance tuple to accept `BinaryOp`.
+- **`packages/fmql/src/fmql/cypher/executor.py`**: validator (`_check_value_expr_vars`) recurses through both operands. The per-binding eval at `_build_edit_plan` is wrapped in a narrow `try / except BinaryOpError`; on catch, the message is recorded in a new `errors_by_pid: dict[PacketId, str]` (first-error-wins) and the binding's set/append bookkeeping is skipped. The op-assembly loop emits a `kind="error"` `EditOp` first for any errored pid and `continue`s, so no other ops are queued for that file.
+- **`packages/fmql/src/fmql/cypher/expr.py`**: new `BinaryOpError(CypherError)` subclass; `BinaryOp` arm in `eval_value_expr`; new `_eval_add(left, right)` helper applying the type-rule priority order — None propagation → list+list extend → list+scalar append → scalar+list prepend → str+str → num+num → `BinaryOpError`. `bool` is excluded from the numeric branch so `True + 1` errors instead of silently becoming `2`. List-concat branches use `[*left, *right]` spread for single-allocation results.
+- **`packages/fmql/src/fmql/edits.py`**: extended the `OpKind` Literal with `"error"`; added a `kind == "error"` arm at the top of `_apply_op` that returns `op.args["message"]` verbatim. Routes through the existing `_apply_op` → `FileChange.error` → `ApplyReport.errors` plumbing untouched.
+- **ADR** (`docs/decisions/0011-binary-plus-error-routing.md`): captures the per-packet error mechanism — why a narrow `BinaryOpError` subclass instead of catching plain `CypherError` (would change behavior of unrelated eval-time errors), why `kind="error"` instead of a side-channel on `EditPlan` (reuses existing apply pipeline), why error-op-first emission (matches `_apply_ops_to_map`'s short-circuit semantics), and four alternatives considered.
+- **README** (`packages/fmql/README.md`): new row in the `SET` operators table for `SET t.field = expr1 + expr2` summarizing the type rules and the absent-field error; clarification appended to the `+=` divergences row pointing at `+` for portability; new "Portability tips" subsection listing the rewrites for users who want their queries to also run on Neo4j.
+- **Tests** (14 new in `packages/fmql/tests/test_cypher_set.py`): list+list extends; list+scalar appends; scalar+list prepends; string+string; numbers (parametrized — int+int, int+float, float+float); per-packet mixed-type error with another packet succeeding; None propagation (sets the field to YAML `null`); left-associative chaining; `+` inside `list_lit`; `+` inside `func_call` (resolver-driven id-versioning roundtrip); parser pin for `+=` consuming the longer match (the bare `+` binds tighter than `+=` in `SET t.f += t.g + "x"`); parser pin for `NOT` binding tighter than `+`.
+- **Workflow housekeeping**: archived prior STATUS body (task 0017) to `docs/changelog/0009.md`; flipped task 0026 to `done`; added task 0026 row to `docs/roadmap.md` under the cypher phase.
 
 ## Verification
 
-- `make format` — reformatted four files (`document_io.py`, `cmd_serialize.py`, `cli/main.py`, `tests/test_document_io.py`, `tests/cli/test_deserialize_cmd.py`) on first pass; rerun clean.
-- `make lint` — clean first run.
-- `make test` — `fmql` 591 passed (was 548; +43 from the three new test files), `fmql-semantic` 56 passed.
+- `make format` — reformatted one file (`executor.py`); rerun clean.
+- `make lint` — clean first run (ruff + black --check).
+- `make test` — `fmql` 605 passed (was 591; +14 from the new binop tests including parametrized cases), `fmql-semantic` 56 passed.
 
 ## Notes
 
-- **`SerializeFormat` lives in `document_io.py`, not in the CLI module.** The library is the source of truth for the format choice; the CLI imports the enum and passes it through. Avoids stringly-typed `fmt: str` at the library boundary and avoids the CLI-importing-CLI dance you'd get if the enum lived in `cmd_serialize.py`.
-- **`_to_commented` is a no-op for already-`CommentedMap`/`CommentedSeq` values.** When `from_yaml` loads a `CommentedMap` from `_IO_YAML.load`, the nested values keep their source style metadata (block vs flow, quote style) instead of being copied into fresh containers with default styling. Cuts a redundant deep-copy on YAML deserialize and incidentally lets flow-style structured-form YAML survive the round-trip.
-- **`from_obj` accepts `CommentedMap` directly because it's a `dict` subclass.** `from_yaml` no longer pre-converts via `_to_plain` before handing off — the validation `isinstance(obj, dict)` check passes for both plain dicts (from JSON) and CommentedMaps (from YAML).
-- **`document_io._IO_YAML` is a separate ruamel instance from `parser._YAML`.** Configured identically today, but the duplication insulates structured I/O from incidental changes to the parser's YAML configuration. The ADR walks through the rationale.
-- **The structured form is not byte-exact for everything.** YAML round-trip is byte-identical for canonical inputs (LF, no BOM, simple scalars, dates, lists, nested maps). JSON loses YAML-specific metadata not expressible in JSON: original quote style on untouched fields, scalar type for `date`/`datetime` (ISO string round-tripping back as a quoted string, not a bare YAML date). CRLF, BOM, EOF-newline-absence are normalized away by both formats. Documented in the README and ADR; users needing byte-exact archival round-trip have the Python `parse → serialize` API.
-- **No `--workspace` flag on either command.** They operate on a single document — `serialize` takes a path, `deserialize` reads stdin. Symmetric stdin/file modes were considered and deferred (ADR 0010); the asymmetric shape matches the two task examples exactly.
+- **`+=` lock-in stays.** ADR 0008's locked-in semantics for `+=` (initialize-on-absent at the property level, nest-on-list-RHS) are unchanged. `+` is the additive Neo4j-portable primitive; `+=` keeps its fmql-sugar ergonomics. The README divergences section now reads as a recipe ("use `+` for portability, `+=` for ergonomics") rather than an apology, which is what ADR 0008 anticipated.
+- **`BinaryOpError` is internal stable surface, not public API.** It's imported by `executor.py` from `expr.py` for the per-binding catch. Tests assert on `ApplyReport.errors[N][1]` (the message string), not the exception class. ADR 0011 walks through why a narrow subclass instead of a generic `CypherError` catch — the latter would change behavior of `_negate` non-bool, `field()` arity errors, and unknown-function dispatch from compile-time abort to per-packet, which is the wrong shape for those cases.
+- **Error-op-first ordering is load-bearing.** The op-assembly loop emits the error op and `continue`s, so non-error ops aren't even queued for an errored pid. `EditPlan.summary()` correctly reports "1 changed, 1 skipped (error), 0 no-op" rather than "0 changed, 1 skipped (error), 1 no-op-because-short-circuited." Symmetric with how `+=` non-list errors interact with subsequent ops on the same file via `_apply_ops_to_map`'s first-error-return.
+- **Earley grammar handles left-recursion fine.** The `?add_expr: add_expr PLUS unary_expr` rule is left-recursive; lark's Earley parser handles this in polynomial time without ambiguity (the only `+`-producing rule recurses on the left, and `unary_expr` doesn't reach back to `add_expr`). LALR was mentioned in the task's grammar sketch but turned out to be a non-issue because the existing parser is Earley.
+- **`_is_number` duplicates `filters._is_number`.** Same logic, both private to their modules. Resolved by inlining behavior — the alternative (cross-module private import or hoisting to a shared `_typing.py` module) is scope creep for a one-task win. If a third call site appears, that's the trigger for extraction.
+- **The `kind="error"` op generalizes.** Any future eval-time per-packet error class can plug into the same routing by adding to the catch tuple in `_build_edit_plan` and reusing the existing `_apply_op` `"error"` arm. No changes needed at any apply-side site.

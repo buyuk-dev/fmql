@@ -262,7 +262,7 @@ Pseudo-fields are read-only: `SET t._path = ...` and `REMOVE t._id` are rejected
 
 #### `SET` and `REMOVE` (bulk migrations)
 
-`SET` rewrites frontmatter on matched packets, `REMOVE` deletes fields. Right-hand sides accept literals, qualified field references (`var.field`), function calls, list literals, list comprehensions, and unary `NOT`. A query may have `SET` only, `REMOVE` only, both, `RETURN` only, or any combination — when `SET`/`REMOVE` is paired with `RETURN`, the writes apply first, then `RETURN` projects against the post-write state (Neo4j ordering). Multiple bindings writing the same `(packet, field)` with different values is rejected as a conflict; `SET t.f = …` and `REMOVE t.f` on the same field is also rejected.
+`SET` rewrites frontmatter on matched packets, `REMOVE` deletes fields. Right-hand sides accept literals, qualified field references (`var.field`), function calls, list literals, list comprehensions, unary `NOT`, and binary `+`. A query may have `SET` only, `REMOVE` only, both, `RETURN` only, or any combination — when `SET`/`REMOVE` is paired with `RETURN`, the writes apply first, then `RETURN` projects against the post-write state (Neo4j ordering). Multiple bindings writing the same `(packet, field)` with different values is rejected as a conflict; `SET t.f = …` and `REMOVE t.f` on the same field is also rejected.
 
 `SET` operators:
 
@@ -270,6 +270,7 @@ Pseudo-fields are read-only: `SET t._path = ...` and `REMOVE t._id` are rejected
 |---|---|
 | `SET t.field = expr` | Replace the field with `expr`. |
 | `SET t.field += expr` | Append `expr` to the existing list, or initialize to `[expr]` when the field is absent. **Differs from Neo4j**: Cypher's `+=` is map-merge at the node level (`SET n += {prop: value}`); fmql's is list-append at the property level. See [Cypher subset — divergences from Neo4j](#cypher-subset--divergences-from-neo4j). |
+| `SET t.field = expr1 + expr2` | Binary `+`. `list + list` extends; `list + scalar` appends; `scalar + list` prepends; `string + string` and `number + number` concat / add. Mixed types (e.g. `string + number`) raise a per-packet error; `None` on either side yields `None`. Against an absent field, `SET t.tags = t.tags + "x"` is a per-packet error — initialize-when-absent is unique to `+=`. |
 | `SET t.field = NOT t.field` | Boolean toggle (broadcasts element-wise over lists). |
 | `SET t.field = [x IN t.list WHERE pred (\| projection)?]` | Neo4j-style list comprehension. Use it to filter or project list-valued fields. |
 
@@ -293,12 +294,20 @@ fmql's grammar borrows Cypher's surface syntax but targets a frontmatter graph r
 
 | Construct | Neo4j semantics | fmql semantics |
 |---|---|---|
-| `SET t.field += expr` | Not legal — Neo4j's `+=` is **map-merge at node level** (`SET n += {prop: value}`) and is undefined at property level. | **List-append** on a single property. Initializes to `[expr]` when the field is absent. The RHS is appended as a single element even if it is itself a list (`SET t.tags += t.extras` → nested). |
+| `SET t.field += expr` | Not legal — Neo4j's `+=` is **map-merge at node level** (`SET n += {prop: value}`) and is undefined at property level. | **List-append** on a single property. Initializes to `[expr]` when the field is absent. The RHS is appended as a single element even if it is itself a list (`SET t.tags += t.extras` → nested). For Neo4j-portable list concat, use `SET t.tags = t.tags + "x"` instead — fmql's `+` follows Neo4j semantics; `+=` keeps fmql's initialize-when-absent ergonomic and the nesting-on-list-RHS behavior pinned by ADR 0008. |
 | `id(n)` | Returns the engine-assigned numeric node id. | Removed in fmql. There is no engine-assigned numeric id; for stable identity, use the `_id` / `_path` pseudo-fields, which are not shadowable by frontmatter. |
 | `path(...)` | The `path` type is a sequence of nodes and relationships. | Removed in fmql. To resolve a value through the path resolver, write `resolve(v, "path")` explicitly. |
 | `uuid(...)` / `slug(...)` | Not Cypher built-ins today, but exist in plugin libraries and may land in standard Cypher. | Removed in fmql. Compose explicitly: `field(resolve(v, "uuid"), "uuid")`, `field(resolve(v, "slug"), "slug")`. |
 
 The chosen direction for these divergences is captured in [`docs/decisions/0008-cypher-divergences-from-neo4j.md`](../../docs/decisions/0008-cypher-divergences-from-neo4j.md). Future divergences will be appended to this section.
+
+##### Portability tips
+
+For queries that should also run on Neo4j, prefer binary `+` over `+=`:
+
+- `SET t.tags = t.tags + "x"` (fmql ↔ Neo4j) — extends a list-valued field. Requires the field to already be a list; absent fields raise a per-packet error.
+- `SET t.tags = t.tags + t.extras` (fmql ↔ Neo4j) — extends with another list. fmql's `+=` would *nest* the RHS as a single element; `+` matches Neo4j's extend semantics.
+- `SET t.tags += "x"` (fmql only) — append-or-initialize. Neo4j has no equivalent at property level. Keep this when the initialize-when-absent ergonomic matters more than portability.
 
 ### Editing via update
 

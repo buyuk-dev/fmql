@@ -15,7 +15,7 @@ from fmql.types import PacketId
 if TYPE_CHECKING:
     from fmql.workspace import Workspace
 
-OpKind = Literal["set", "remove", "rename", "append", "toggle"]
+OpKind = Literal["set", "remove", "rename", "append", "toggle", "error"]
 
 
 @dataclass(frozen=True)
@@ -62,6 +62,8 @@ def _type_name(value: Any) -> str:
 
 def _apply_op(fm: CommentedMap, op: EditOp) -> Optional[str]:
     kind = op.kind
+    if kind == "error":
+        return op.args["message"]
     if kind == "set":
         assignments: dict[str, Any] = op.args["assignments"]
         for field_name, value in assignments.items():

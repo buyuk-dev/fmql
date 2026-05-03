@@ -12,9 +12,14 @@ set_op: EQ | PLUS_EQ
 
 remove_clause: REMOVE_KW qualified_ident (COMMA qualified_ident)*
 
-?value_expr: value_atom
+?value_expr: add_expr
+
+?add_expr: add_expr PLUS unary_expr           -> ve_add
+         | unary_expr
+
+?unary_expr: NOT_KW unary_expr                -> ve_not
+           | value_atom
            | func_call
-           | NOT_KW value_expr               -> ve_not
            | list_lit
            | list_comp
 
@@ -116,6 +121,7 @@ COMMA: ","
 PIPE: "|"
 
 PLUS_EQ: "+="
+PLUS: "+"
 GTE: ">="
 LTE: "<="
 NEQ: "!=" | "<>"

@@ -16,6 +16,8 @@ Last updated: 2026-05-03.
 | [0010](tasks/0010-cypher-limit-clause.md) | done | 3 | Cypher `LIMIT N` clause and `--limit` flag |
 | [0016](tasks/0016-cypher-return-literals.md) | done | 3 | Allow string / number literals as `RETURN` items |
 | [0022](tasks/0022-cypher-compatibility-divergences.md) | done | 3 | Resolve Cypher-compatibility divergences |
+| [0026](tasks/0026-cypher-binary-plus-list-concat.md) | done | 2 | Add binary `+` to Cypher value expressions for Neo4j-portable list concatenation |
+| [0027](tasks/0027-cypher-backtick-quoted-identifiers.md) | todo | 2 | Backtick-quoted identifiers for hyphenated frontmatter keys |
 
 ## Phase: cli
 
