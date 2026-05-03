@@ -1,19 +1,48 @@
 # Changelog
 
-## [Unreleased]
+## [0.3.0] - 2026-05-04
 
 ### Removed (BREAKING)
 
 - The qlang filter DSL is gone. The `fmql.qlang` module (`grammar.lark`, `compile.py`, `__init__.py`) is deleted. There is no shim, no fallback, no "did you mean" — see [docs/tasks/0021](../../docs/tasks/0021-deprecate-qlang-rename-cypher-to-query.md) for the rationale.
-- `fmql cypher` is removed as a standalone command.
+- `fmql cypher` is removed as a standalone command (folded into `fmql query`).
+- The legacy ergonomic edit commands `fmql set`, `fmql append`, `fmql remove`, `fmql rename`, `fmql toggle` are deleted. Their function is subsumed by `fmql update '<Cypher SET/REMOVE>'`.
+- Cypher function shortcuts `id()`, `uuid()`, `slug()`, `path()` are removed from the function registry. Compose `field(resolve(v, "<name>"), "<name>")` (or `resolve(v, "path")`) explicitly. Each removed name now raises with a hint at the explicit form. See ADR 0008.
 
 ### Changed (BREAKING)
 
 - `fmql query` now speaks the Cypher subset that `fmql cypher` used to speak; it absorbed the old qlang command's name. The old qlang argument form (`'status = "active"'`) no longer parses — pass full Cypher (`'MATCH (t) WHERE t.status = "active" RETURN t'`).
 - `fmql subgraph` seed argument is now a Cypher query (e.g. `'MATCH (t) WHERE t.uuid = "task-1" RETURN t'`) instead of a qlang predicate.
 - `fmql index --filter` accepts a Cypher query instead of a qlang predicate.
+- All CLI commands (`query`, `subgraph`, `describe`, `update`, `index`, `search`) now take a single `-w/--workspace` flag (default cwd) instead of mixed positional/`--target`/`--workspace` shapes. `-w <file>` and `-w <missing>` produce clean errors instead of Python tracebacks.
 - The new `fmql query` keeps the old qlang command's traversal/search flags: `--follow`, `--depth`, `--direction`, `--include-origin`, `--search`, `--index`, `--index-location`. These chain a `Query` walk after the Cypher result and require `RETURN` to be a single packet variable.
 - `--format` on `fmql query` now supports `paths` (default for single-packet-var `RETURN`), `rows` (default otherwise), and `json`.
+
+### Added
+
+- `fmql update '<Cypher>'` — bulk migrations driven by Cypher `SET`/`REMOVE` clauses (e.g. `MATCH (t) WHERE t.status = "todo" SET t.status = "active"`).
+- Cypher `SET` clause with operators `=` (replace) and `+=` (list append). `+=` initializes absent fields as a list and appends; nested-list RHS appends the inner list as an element. See ADR 0008 for divergence from Neo4j's map-merge `+=`.
+- Cypher `REMOVE` clause (`REMOVE t.field, t.field2`), with conflict detection against `SET` on the same field.
+- Cypher binary `+` on value expressions for Neo4j-portable list/string/number concatenation. Type rules: list+list extends, list+scalar appends, scalar+list prepends, str+str, num+num; mixed types error per-packet without aborting the whole plan. `null` propagates. See ADR 0011.
+- Cypher unary `NOT` in value expressions (subsumes the old `toggle` command: `SET t.flag = NOT t.flag`).
+- Neo4j-style list comprehensions (`SET t.tags = [x IN t.tags WHERE x <> "foo"]`).
+- Cypher backtick-quoted identifiers for hyphenated frontmatter keys (e.g. `` n.`org-type` ``). Resolves [#15](https://github.com/buyuk-dev/fmql/issues/15).
+- Cypher `LIMIT N` clause and `--limit` flag on `fmql query`.
+- Cypher `WHERE` extensions: `NOT IN`, `IS NOT NULL`, and the bare `null` literal.
+- String and number literals as items in Cypher `RETURN` (e.g. `RETURN t, "active" AS status`).
+- Cypher pseudo-fields `_id` and `_path` on packets (resolver-aware id and workspace-relative path), available in `MATCH`/`WHERE`/`SET`/`RETURN`/`ORDER BY`. Virtual properties `t.path`, `t.filename`, `t.slug` likewise available.
+- `fmql serialize` / `fmql deserialize` commands for round-tripping a frontmatter document through a structured `{header, body}` JSON or YAML form. YAML round-trip is byte-identical for canonical inputs; JSON preserves keys/ordering/body but loses YAML-specific metadata.
+- `fmql.parse`, `fmql.parse_file`, `fmql.serialize` exposed at the top level of the `fmql` package.
+- `:=` JSON operator on `fmql update` for assigning JSON-decoded list/dict values (e.g. `SET t.tags := '["a", "b"]'`).
+- `IdResolver` builtin (registered as `id`) — matches on the `id` frontmatter field with int/str cross-coercion. Fixes silent empty-edge results for the common numeric-id case (YAML coerces unquoted ints).
+- `WORKSPACE.md` `fmql:` config block: per-field resolver bindings via `fmql.resolvers.<field>: <name>`, optional `fmql.default_resolver`, and `fmql.diagnose: true` to enable diagnostics workspace-wide.
+- `--diagnose` flag on `query`, `subgraph` (default off): emits stderr warnings naming unresolved values, current resolver, and a suggested resolver. Resolver precedence on follow: explicit CLI `--resolver` > WORKSPACE.md per-field binding > default.
+
+### Documentation
+
+- New "Cypher subset — divergences from Neo4j" section in the README, plus "Portability tips" listing rewrites for queries that should also run on Neo4j.
+- ADR 0008 (Cypher divergences from Neo4j: `+=` semantics, removed function shortcuts).
+- ADR 0011 (binary `+` per-packet error routing).
 
 ### Unchanged
 
