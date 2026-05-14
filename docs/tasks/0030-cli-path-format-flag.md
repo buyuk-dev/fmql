@@ -1,6 +1,6 @@
 ---
 id: 0030
-title: `--path-format` flag for `fmql query` (workspace | relative | absolute)
+title: "`--path-format` flag for `fmql query` (workspace | relative | absolute)"
 status: todo
 priority: 2
 created: 2026-05-14
