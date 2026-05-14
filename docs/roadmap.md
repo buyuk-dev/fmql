@@ -18,6 +18,7 @@ Last updated: 2026-05-03.
 | [0022](tasks/0022-cypher-compatibility-divergences.md) | done | 3 | Resolve Cypher-compatibility divergences |
 | [0026](tasks/0026-cypher-binary-plus-list-concat.md) | done | 2 | Add binary `+` to Cypher value expressions for Neo4j-portable list concatenation |
 | [0027](tasks/0027-cypher-backtick-quoted-identifiers.md) | done | 2 | Backtick-quoted identifiers for hyphenated frontmatter keys |
+| [0028](tasks/0028-cypher-pseudo-fields-created-updated.md) | todo | 2 | Filesystem-timestamp pseudo-fields `_created` / `_updated` |
 
 ## Phase: cli
 
