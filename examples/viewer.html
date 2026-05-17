@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>fmql vault viewer</title>
+<style>
+  html, body { margin: 0; height: 100%; font-family: system-ui, sans-serif; }
+  #cy { position: absolute; inset: 0; background: #fafafa; }
+  #toolbar {
+    position: absolute; top: 12px; left: 12px; z-index: 10;
+    background: white; padding: 8px 12px; border-radius: 6px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.1);
+    display: flex; gap: 12px; align-items: center; font-size: 13px;
+    flex-wrap: wrap; max-width: calc(100vw - 24px);
+  }
+  #toolbar label { display: flex; gap: 4px; align-items: center; }
+  #status { color: #666; }
+  #drop-hint {
+    position: absolute; inset: 0; display: flex;
+    align-items: center; justify-content: center;
+    pointer-events: none; color: #999; font-size: 18px;
+  }
+  #drop-hint.hidden { display: none; }
+  body.drag #cy { background: #eef6ff; }
+</style>
+</head>
+<body>
+<div id="toolbar">
+  <label>file <input type="file" id="file" accept=".cyjs,.json"></label>
+  <label>layout
+    <select id="layout">
+      <option value="fcose">fcose (force, packs components)</option>
+      <option value="cose-bilkent">cose-bilkent (force)</option>
+      <option value="cose">cose (built-in force)</option>
+      <option value="breadthfirst">breadthfirst</option>
+      <option value="concentric">concentric</option>
+      <option value="grid">grid</option>
+      <option value="circle">circle</option>
+    </select>
+  </label>
+  <label><input type="checkbox" id="hide-orphans"> hide isolated nodes</label>
+  <span id="status">drop a .cyjs file anywhere</span>
+</div>
+<div id="cy"></div>
+<div id="drop-hint">drop a .cyjs file anywhere on this page</div>
+
+<script src="https://cdn.jsdelivr.net/npm/cytoscape@3.30.2/dist/cytoscape.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/layout-base@2.0.1/layout-base.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/cose-base@2.2.0/cose-base.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/cytoscape-fcose@2.2.0/cytoscape-fcose.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/cytoscape-cose-bilkent@4.1.0/cytoscape-cose-bilkent.js"></script>
+<script>
+if (typeof cytoscapeFcose !== 'undefined')       cytoscape.use(cytoscapeFcose);
+if (typeof cytoscapeCoseBilkent !== 'undefined') cytoscape.use(cytoscapeCoseBilkent);
+
+const cy = cytoscape({
+  container: document.getElementById('cy'),
+  style: [
+    { selector: 'node', style: {
+        'background-color': '#5b8def',
+        'label': 'data(id)',
+        'font-size': 11,
+        'color': '#222',
+        'text-valign': 'center',
+        'text-halign': 'center',
+        'text-wrap': 'wrap',
+        'text-max-width': 120,
+        'width': 'label', 'height': 'label',
+        'padding': 8, 'shape': 'round-rectangle',
+    }},
+    { selector: 'edge', style: {
+        'width': 1.5,
+        'line-color': '#aaa',
+        'target-arrow-color': '#aaa',
+        'target-arrow-shape': 'triangle',
+        'curve-style': 'bezier',
+        'label': 'data(field)',
+        'font-size': 9,
+        'color': '#666',
+        'text-background-color': '#fafafa',
+        'text-background-opacity': 1,
+        'text-background-padding': 2,
+    }},
+    { selector: 'edge[field = "mentions"]',     style: { 'line-color': '#bbb', 'target-arrow-color': '#bbb' }},
+    { selector: 'edge[field = "owner"]',        style: { 'line-color': '#e07a5f', 'target-arrow-color': '#e07a5f' }},
+    { selector: 'edge[field = "contributors"]', style: { 'line-color': '#81b29a', 'target-arrow-color': '#81b29a' }},
+    { selector: 'edge[field = "relates_to"]',   style: { 'line-color': '#f2cc8f', 'target-arrow-color': '#f2cc8f' }},
+    { selector: '.hidden', style: { 'display': 'none' }},
+  ],
+});
+
+const status = document.getElementById('status');
+const dropHint = document.getElementById('drop-hint');
+const layoutSel = document.getElementById('layout');
+const fileInput = document.getElementById('file');
+const hideOrphans = document.getElementById('hide-orphans');
+let currentLayout = 'fcose';
+
+function layoutOptions(name) {
+  const base = { name, animate: false, padding: 30, fit: true };
+  if (name === 'fcose') {
+    return { ...base, quality: 'default', randomize: true, packComponents: true,
+             nodeRepulsion: 6000, idealEdgeLength: 60, nodeSeparation: 90 };
+  }
+  if (name === 'cose-bilkent') {
+    return { ...base, idealEdgeLength: 80, nodeRepulsion: 6000, randomize: true };
+  }
+  if (name === 'cose') {
+    return { ...base, nodeRepulsion: 8000, idealEdgeLength: 80 };
+  }
+  return base;
+}
+
+function applyOrphanFilter() {
+  const hide = hideOrphans.checked;
+  cy.nodes().forEach(n => n.toggleClass('hidden', hide && n.degree(false) === 0));
+}
+
+function runLayout() {
+  const visible = cy.elements().not('.hidden');
+  const layout = (visible.length ? visible : cy.elements()).layout(layoutOptions(currentLayout));
+  layout.run();
+}
+
+function loadGraph(json, sourceName) {
+  const elements = json.elements || json;
+  cy.elements().remove();
+  cy.add(elements);
+  applyOrphanFilter();
+  runLayout();
+  cy.fit(undefined, 30);
+  const total = cy.nodes().length;
+  const orphans = cy.nodes().filter(n => n.degree(false) === 0).length;
+  status.textContent = `${sourceName} — ${total} nodes (${orphans} isolated), ${cy.edges().length} edges`;
+  dropHint.classList.add('hidden');
+}
+
+function readFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try { loadGraph(JSON.parse(e.target.result), file.name); }
+    catch (err) { status.textContent = `parse error: ${err.message}`; }
+  };
+  reader.readAsText(file);
+}
+
+layoutSel.addEventListener('change', e => { currentLayout = e.target.value; runLayout(); });
+hideOrphans.addEventListener('change', () => { applyOrphanFilter(); runLayout(); });
+fileInput.addEventListener('change', e => { if (e.target.files[0]) readFile(e.target.files[0]); });
+
+document.addEventListener('dragover', e => { e.preventDefault(); document.body.classList.add('drag'); });
+document.addEventListener('dragleave', () => document.body.classList.remove('drag'));
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  document.body.classList.remove('drag');
+  if (e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]);
+});
+</script>
+</body>
+</html>
