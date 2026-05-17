@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import math
-from typing import Any, Iterable, Iterator, Optional, Union
+from typing import Iterable, Iterator, Optional, Union
 
+from fmql.edges import iter_forward_targets, iter_reverse_sources
 from fmql.errors import QueryError
 from fmql.types import PacketId, Resolver
 from fmql.workspace import Workspace
@@ -59,24 +60,8 @@ def _neighbors(
     direction: str,
 ) -> Iterator[PacketId]:
     if direction == "forward":
-        packet = workspace.packets.get(pid)
-        if packet is None:
-            return
-        raw = packet.as_plain().get(field)
-        for item in _iter_raw(raw):
-            tgt = resolver.resolve(item, origin=pid, workspace=workspace)
-            if tgt is not None:
-                yield tgt
+        yield from iter_forward_targets(workspace, pid, field, resolver)
     elif direction == "reverse":
-        yield from workspace.reverse_index(field, resolver).get(pid, ())
+        yield from iter_reverse_sources(workspace, pid, field, resolver)
     else:
         raise QueryError(f"invalid direction: {direction!r}")
-
-
-def _iter_raw(raw: Any) -> Iterator[Any]:
-    if raw is None:
-        return
-    if isinstance(raw, (list, tuple)):
-        yield from raw
-    else:
-        yield raw

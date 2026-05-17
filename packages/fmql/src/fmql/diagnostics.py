@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Iterable, Optional
+from typing import Any, Iterable, Literal, Optional
 
 import typer
 
 from fmql.filters import type_name
 from fmql.resolvers import name_for
-from fmql.types import Resolver
+from fmql.types import PacketId, Resolver
+from fmql.wikilinks import (
+    MENTIONS_FIELD,
+    match_whole_value_wikilink,
+    resolve_wikilink,
+)
 from fmql.workspace import Workspace
 
 _SUGGESTION_BY_KIND: dict[str, str] = {
@@ -28,6 +33,15 @@ class FieldMismatch:
     suggested_resolver: Optional[str]
 
 
+@dataclass(frozen=True)
+class WikilinkDiagnostic:
+    kind: Literal["ambiguous", "unresolved"]
+    source: PacketId
+    field: str
+    raw: str
+    candidates: tuple[PacketId, ...]
+
+
 def diagnose_field(workspace: Workspace, field: str, resolver: Resolver) -> Optional[FieldMismatch]:
     populated_packets = 0
     total_values = 0
@@ -42,6 +56,10 @@ def diagnose_field(workspace: Workspace, field: str, resolver: Resolver) -> Opti
         populated_packets += 1
         items = raw if isinstance(raw, (list, tuple)) else [raw]
         for item in items:
+            # Wikilink-shaped items are diagnosed by diagnose_wikilinks; they
+            # don't contribute to the resolver-mismatch counters at all.
+            if match_whole_value_wikilink(item) is not None:
+                continue
             total_values += 1
             if resolver.resolve(item, origin=pid, workspace=workspace) is not None:
                 resolved_values += 1
@@ -69,6 +87,42 @@ def diagnose_field(workspace: Workspace, field: str, resolver: Resolver) -> Opti
     )
 
 
+def diagnose_wikilinks(workspace: Workspace, fields: Iterable[str]) -> list[WikilinkDiagnostic]:
+    """Collect ambiguous and unresolved wikilink diagnostics for the given fields.
+
+    For ``field == "mentions"``: scans body wikilinks on every packet.
+    For any field: scans frontmatter items wholly wrapped in ``[[]]``.
+    """
+    seen_fields: set[str] = set()
+    out: list[WikilinkDiagnostic] = []
+
+    def _record(src: PacketId, field: str, link) -> None:
+        res = resolve_wikilink(link, workspace)
+        if not res.candidates:
+            out.append(WikilinkDiagnostic("unresolved", src, field, link.raw, ()))
+        elif len(res.candidates) > 1:
+            out.append(WikilinkDiagnostic("ambiguous", src, field, link.raw, res.candidates))
+
+    for field in fields:
+        if field in seen_fields:
+            continue
+        seen_fields.add(field)
+        for src in sorted(workspace.packets):
+            packet = workspace.packets[src]
+            if field == MENTIONS_FIELD:
+                for link in workspace.body_wikilinks(src):
+                    _record(src, field, link)
+            raw = packet.as_plain().get(field)
+            if raw is None:
+                continue
+            items = raw if isinstance(raw, (list, tuple)) else [raw]
+            for item in items:
+                link = match_whole_value_wikilink(item)
+                if link is not None:
+                    _record(src, field, link)
+    return out
+
+
 def format_warning(mismatch: FieldMismatch) -> str:
     unresolved = mismatch.total_values - mismatch.resolved_values
     sample = ", ".join(repr(v) for v in mismatch.sample_unresolved)
@@ -88,13 +142,27 @@ def format_warning(mismatch: FieldMismatch) -> str:
     return "\n".join(lines)
 
 
+def format_wikilink_warning(d: WikilinkDiagnostic) -> str:
+    if d.kind == "unresolved":
+        return (
+            f"warning: wikilink [[{d.raw}]] in {d.source} " f"(field {d.field!r}) matches no packet"
+        )
+    chosen, *alternates = d.candidates
+    alts = ", ".join(alternates)
+    return (
+        f"warning: wikilink [[{d.raw}]] in {d.source} "
+        f"(field {d.field!r}) is ambiguous; picked {chosen} (alternates: {alts})"
+    )
+
+
 def emit_resolver_warnings(
     workspace: Workspace,
     fields: Iterable[str],
     resolver: Optional[Resolver] = None,
 ) -> None:
+    field_list = list(fields)
     seen: set[str] = set()
-    for field in fields:
+    for field in field_list:
         if field in seen:
             continue
         seen.add(field)
@@ -102,6 +170,8 @@ def emit_resolver_warnings(
         mismatch = diagnose_field(workspace, field, eff_resolver)
         if mismatch is not None:
             typer.echo(format_warning(mismatch), err=True)
+    for diagnostic in diagnose_wikilinks(workspace, field_list):
+        typer.echo(format_wikilink_warning(diagnostic), err=True)
 
 
 def maybe_emit_warnings(
@@ -111,6 +181,6 @@ def maybe_emit_warnings(
     diagnose: bool,
     resolver: Optional[Resolver] = None,
 ) -> None:
-    """Emit resolver warnings only when CLI flag or workspace default opts in."""
+    """Emit resolver + wikilink warnings only when CLI flag or workspace default opts in."""
     if diagnose or workspace.diagnose_default:
         emit_resolver_warnings(workspace, fields, resolver=resolver)

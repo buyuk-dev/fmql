@@ -9,11 +9,17 @@ from fmql.config import (
     load_workspace_config,
     read_diagnose_flag,
 )
+from fmql.edges import iter_body_wikilink_targets, resolve_item
 from fmql.errors import ParseError
 from fmql.packet import Packet
 from fmql.parser import parse_file
 from fmql.resolvers import RelativePathResolver
 from fmql.types import PacketId, Resolver
+from fmql.wikilinks import (
+    MENTIONS_FIELD,
+    WikilinkTarget,
+    parse_body_wikilinks,
+)
 
 
 class Workspace:
@@ -41,6 +47,7 @@ class Workspace:
         self._field_index: dict[str, dict[Any, list[PacketId]]] = {}
         self._stem_index: Optional[dict[str, list[PacketId]]] = None
         self._reverse_cache: dict[tuple[str, int], dict[PacketId, list[PacketId]]] = {}
+        self._body_wikilinks: dict[PacketId, list[WikilinkTarget]] = {}
         self._scan()
 
     def _scan(self) -> None:
@@ -62,12 +69,14 @@ class Workspace:
                     warnings.warn(f"skipped {pid}: {e}", stacklevel=2)
                     continue
                 self.packets[pid] = packet
+                self._body_wikilinks[pid] = parse_body_wikilinks(packet.body)
 
     def rescan(self) -> None:
         self.packets.clear()
         self._field_index.clear()
         self._stem_index = None
         self._reverse_cache.clear()
+        self._body_wikilinks.clear()
         self._scan()
 
     def __len__(self) -> int:
@@ -115,24 +124,41 @@ class Workspace:
         return idx
 
     def reverse_index(self, field: str, resolver: Resolver) -> dict[PacketId, list[PacketId]]:
-        """Lazy reverse adjacency: {target_pid: [source_pids]} for `field` via `resolver`."""
+        """Lazy reverse adjacency: ``{target_pid: [source_pids]}`` for ``field``.
+
+        Fuses wikilink-derived sources with resolver-derived sources. For
+        ``field == "mentions"``, body-wikilink sources contribute in addition
+        to frontmatter ``mentions`` items. For any field, frontmatter items
+        wholly wrapped in ``[[]]`` resolve as wikilinks; remaining items go
+        through ``resolver``. Sources are deduped per target.
+        """
         key = (field, id(resolver))
         cached = self._reverse_cache.get(key)
         if cached is not None:
             return cached
         idx: dict[PacketId, list[PacketId]] = {}
+
+        def _add(target: PacketId, src: PacketId) -> None:
+            bucket = idx.setdefault(target, [])
+            if src not in bucket:
+                bucket.append(src)
+
         for src in sorted(self.packets):
             packet = self.packets[src]
+            if field == MENTIONS_FIELD:
+                for tgt in iter_body_wikilink_targets(self, src):
+                    _add(tgt, src)
             raw = packet.as_plain().get(field)
             if raw is None:
                 continue
             items = raw if isinstance(raw, (list, tuple)) else [raw]
             for item in items:
-                tgt = resolver.resolve(item, origin=src, workspace=self)
-                if tgt is None:
-                    continue
-                bucket = idx.setdefault(tgt, [])
-                if src not in bucket:
-                    bucket.append(src)
+                tgt = resolve_item(self, src, item, resolver)
+                if tgt is not None:
+                    _add(tgt, src)
         self._reverse_cache[key] = idx
         return idx
+
+    def body_wikilinks(self, pid: PacketId) -> list[WikilinkTarget]:
+        """Cached body wikilinks for a packet, populated during scan."""
+        return self._body_wikilinks.get(pid, [])

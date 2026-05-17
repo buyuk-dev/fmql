@@ -2,7 +2,13 @@
 
 A snapshot of in-flight and queued work. The source of truth is `docs/tasks/` — this file is regenerated from it. Run `fmql query 'MATCH (t) RETURN t.id, t.title, t.status, t.priority, t.phase ORDER BY t.priority, t.id' -w docs/tasks --format rows` to refresh.
 
-Last updated: 2026-05-03.
+Last updated: 2026-05-17.
+
+## Phase: parser
+
+| ID | Status | P | Title |
+|---|---|---|---|
+| [0029](tasks/0029-wikilinks-support.md) | done | 1 | Wikilink support — body parsing and frontmatter `[[]]` value recognition |
 
 ## Phase: cypher (the query language)
 

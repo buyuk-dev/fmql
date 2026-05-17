@@ -1,39 +1,77 @@
 ---
-session_id: 97964222-9d9b-40d3-87b3-96f57f486743
-task_id: 27
-branch: feature/cypher-backtick-quoted-identifiers
+session_id: eb18c243-232b-4caf-9bc6-8570b4748856
+task_id: '0029'
+branch: feature/wikilinks-support
 phase: done
-started: '2026-05-03T21:37:09Z'
+started: '2026-05-17T01:03:13Z'
 ---
-Task **0027 — Backtick-quoted identifiers for hyphenated frontmatter keys (`t.\`org-type\``)** finalized.
+Task **0029 — Wikilink support (body parsing + frontmatter `[[]]` value recognition)** finalized.
 
-Branch: `feature/cypher-backtick-quoted-identifiers`. Plan: `~/.claude/plans/get-started-on-task-vast-melody.md`.
+Branch: `feature/wikilinks-support`. Plan: `~/.claude/plans/get-started-on-task-elegant-nest.md`. ADR: [`docs/decisions/0012-wikilinks-as-per-item-dispatch.md`](docs/decisions/0012-wikilinks-as-per-item-dispatch.md).
 
 ## Outcome
 
-- **`packages/fmql/src/fmql/cypher/grammar.lark`**: new `BACKTICK_IDENT.2: /\`[^\`]+\`/` token (priority above bare `IDENT.1`, though no leading-char collision actually exists) and `?field_name: IDENT | BACKTICK_IDENT` inline non-terminal. The `?` is load-bearing — Lark inlines `field_name`, so the transformer methods receive the raw `Token` directly (no `field_name(self, children)` method needed). `field_name` replaces the second `IDENT` in two slots only: `qualified_ident: IDENT ("." field_name)?` and `return_item: IDENT "." field_name -> r_field`. All other `IDENT` slots — pattern variables (`node`), labels, relationship types (`rel`), function names (`func_call`), list-comprehension bindings (`list_comp`), bare RETURN variables (`r_var`), and `count(IDENT)` — stay bare, so backticks parse-error in those positions (pinned by 10-entry parametrized test).
-- **`packages/fmql/src/fmql/cypher/compile.py`**: two new module-private helpers next to the existing `_is_ident` (which stays unchanged, still used by `node`/`rel`/`func_call`/`list_comp` transformers that must reject backticks):
-  - `_is_field_or_ident(obj)` — accepts `Token` of type `IDENT` or `BACKTICK_IDENT`.
-  - `_ident_value(tok)` — short-circuits on `tok.type == "BACKTICK_IDENT"` and slices `s[1:-1]` to strip the surrounding backticks; returns the raw string for bare `IDENT`. Single token-tag check on the hot path; no per-call string predicates.
-  Two transformer call sites updated: `r_field` now does `field=_ident_value(field_ident)`, and `qualified_ident` now filters with `_is_field_or_ident` and maps with `_ident_value`. No other compile-side change is needed because all downstream sites (`set_item`, `remove_clause`, `ve_ref`, `order_ref_qual`, all 7 predicates) consume the string returned by `qualified_ident` and split via `partition(".")` — backticks are already stripped by then. The first-`.` partition handles backticked-fields-with-dots correctly because the var slot is bare-`IDENT`-only (no dots possible), so the join-then-partition round-trip is unambiguous.
-- **`packages/fmql/README.md`**: new backtick example in the `WHERE` recipe block (`fmql query 'MATCH (t) WHERE t.\`org-type\` = "school" RETURN t' -w ./project`) plus a one-paragraph explainer below pinning that backticks match Neo4j's escape syntax, accept hyphens/dots/spaces/unicode, and apply only after a `.`. The "Cypher subset — divergences from Neo4j" table is intentionally not touched — this feature aligns with Neo4j, it's not a divergence.
-- **No ADR.** The judgment calls in this task (field-name-slot only, single-string field representation with no quoting metadata, no `` `` `` embedded-backtick escape, generic Lark `UnexpectedCharacters` message rather than custom-translated hint) are all either captured in the task spec's existing Notes / Out-of-scope sections or are mechanical extensions of existing token-handling patterns. None rise to the level of an ADR.
-- **Tests** (31 new across three existing modules):
-  - `tests/test_cypher.py` (+19): three parser-identity tests pinning `t.status` ↔ `` t.`status` `` AST equality across WHERE / RETURN / SET+REMOVE+ORDER+RETURN combined; WHERE eq / IN / IS NULL / CONTAINS on hyphenated key; mixed-with-bare WHERE; RETURN column header (`"t.org-type"`); ORDER BY hyphenated; field-with-dots / field-with-space / field-with-unicode pins; 10-entry parametrized parse-error block covering empty backticks, unterminated backtick, embedded `` `` ``, backtick on pattern variable / label / relationship type / function name / list-comp binding / RETURN variable / `count(...)` argument.
-  - `tests/test_cypher_set.py` (+6): SET-writes-file on hyphenated key; `+=` parses identically to bare; binary-`+` concat with all-backtick operands (`SET t.\`display-name\` = t.\`first-name\` + " " + t.\`last-name\``); validator-recursion regression (`SET t.\`org-type\` = t.\`org-type\` + "_v2"` round-trips through `compile_cypher_ast` without "undeclared variable"); pseudo-field rejection still firing under backticks (`` SET t.`_id` = "x" `` rejected).
-  - `tests/test_cypher_remove.py` (+2): REMOVE drops hyphenated key with sibling-key untouched-ness pin; `` REMOVE t.`_path` `` still rejected as pseudo-field write.
-- **Workflow housekeeping**: archived prior STATUS body (task 0026) to `docs/changelog/0010.md`; flipped task 0027 to `done`; flipped its row in `docs/roadmap.md` to `done`.
+- **New `packages/fmql/src/fmql/wikilinks.py`** (pure parse + resolve, no Workspace state):
+  - `BODY_WIKILINK_RE = (?<!!)\[\[…\]\]` — negative lookbehind skips Obsidian's `![[…]]` embed syntax (out of scope for v1 per task notes).
+  - `WHOLE_VALUE_WIKILINK_RE = ^\s*\[\[…\]\]\s*$` — frontmatter items wholly wrapped in brackets, leaving partial-string matches alone.
+  - `WikilinkTarget(raw, target)` — `target` is `raw` with `#heading`/`^block-id` stripped (resolution is file-level per task; block refs deferred).
+  - `parse_body_wikilinks(body) -> list[WikilinkTarget]`.
+  - `match_whole_value_wikilink(value) -> Optional[WikilinkTarget]`.
+  - `resolve_wikilink(link, workspace) -> WikilinkResolution(target, candidates)` — path-form via `workspace.packets` membership (tries `target` and `target + ".md"`); basename-form via `workspace.index_by_stem()` with alphabetical-by-pid tiebreak.
+  - `MENTIONS_FIELD = "mentions"` — the canonical edge type for body wikilinks; lives here (the wikilinks concept) so `edges.py`, `workspace.py`, and `diagnostics.py` all import from a non-circular leaf.
+
+- **New `packages/fmql/src/fmql/edges.py`** (single source of truth for forward+reverse edge enumeration):
+  - `resolve_item(workspace, src, item, resolver)` — per-item dispatch: if `match_whole_value_wikilink(item)` matches, resolve as wikilink (resolver is *not* called); else fall through to the configured resolver. This is the structural enforcement of the frontmatter-shadowing rule.
+  - `iter_body_wikilink_targets(workspace, pid)` — resolved body-link targets, dropping danglers. Reused by both forward and reverse enumeration to avoid the three-site duplication of the body-resolve loop.
+  - `iter_forward_targets(workspace, pid, field, resolver)` — for `field == MENTIONS_FIELD`, yields body-derived targets first; then iterates frontmatter items through `resolve_item`. Per-call `seen` set dedups across the two sources.
+  - `iter_reverse_sources` — thin pass-through to `Workspace.reverse_index(field, resolver)`.
+
+- **`packages/fmql/src/fmql/workspace.py`**:
+  - `_body_wikilinks: dict[PacketId, list[WikilinkTarget]]` populated eagerly in `_scan()` (one regex pass per file at load; ADR 0012 commits to eager — lazy is a follow-up if 10k-vault profiling shows the cost).
+  - `body_wikilinks(pid)` accessor for `edges.py` and `diagnostics.py`.
+  - `reverse_index(field, resolver)` extended in place to fuse wikilink-derived sources with resolver-derived sources. Same name, same cache key `(field, id(resolver))`, broader semantics. Mention-field branch reuses `iter_body_wikilink_targets`; the per-item branch reuses `resolve_item` — zero duplication of the dispatch logic.
+  - Dropped the planned `fused_reverse_index` second method after the grep showed the only external caller of `reverse_index` was a cache-identity test that doesn't care which semantics the method has.
+
+- **Refactor (regression gate):** `traversal._neighbors`, `subgraph._edges_for`, `cypher/executor._neighbors` previously duplicated the same "get field, iter, resolve" loop three ways. All three now delegate to `edges.iter_forward_targets` / `iter_reverse_sources`. Existing test suite (605 tests) passed before any wikilink semantics landed, then 76 new tests added on top.
+
+- **`packages/fmql/src/fmql/diagnostics.py`**:
+  - New `WikilinkDiagnostic(kind, source, field, raw, candidates)` with `kind: "ambiguous" | "unresolved"`.
+  - `diagnose_wikilinks(workspace, fields)` — for `field == "mentions"` scans body wikilinks; for any field also scans frontmatter `[[]]` items. Inner `_record` helper collapses the body-vs-frontmatter classification (two structurally-identical post-resolve branches).
+  - `format_wikilink_warning(d)` produces the stderr line.
+  - `emit_resolver_warnings` and `maybe_emit_warnings` now emit both `FieldMismatch` and `WikilinkDiagnostic` lines through the existing `--diagnose` / `WORKSPACE.md fmql.diagnose: true` plumbing — no new CLI flag.
+  - `diagnose_field` short-circuits `[[]]`-shaped items so they don't get double-counted as resolver-unresolved (otherwise every `related: ["[[Strategy]]"]` would fire a false-positive resolver warning).
+
+- **ADR 0012 (`docs/decisions/0012-wikilinks-as-per-item-dispatch.md`):** captures the per-item dispatch design (vs. a configurable `WikilinkResolver`, vs. a second-pass enumeration), the `mentions` magic-field union semantics with dedup, the `reverse_index` collapse, and four alternatives considered with explicit rejection rationale.
+
+- **README** (`packages/fmql/README.md`): new "Wikilinks (Obsidian compatibility)" subsection under Traversal & resolvers covering both shapes, resolution rules (basename / path-form / fragment-strip / alphabetical tiebreak), the per-item shadowing rule, and out-of-scope embeds + heading refs. Uses `_id` pseudo-field in examples to match the actual Cypher surface.
+
+- **Tests (76 new across 4 modules):**
+  - `tests/test_wikilinks.py` (20): regex pinning (body, alias, embed-skip, fragment-strip, whole-value match), basename resolve (single, ambiguous-alphabetical, missing), path-form (with/without `.md`, missing).
+  - `tests/test_traversal_wikilinks.py` (11): `mentions` forward + reverse via `follow`; frontmatter `[[]]` scalar + list typed by property name; mixed list with explicit `UuidResolver` to pin the "resolver doesn't run for `[[]]` items" shadowing rule; dangling silently drops; `depth='*'`; regression pin that `project_pm_ws` (no wikilinks) behavior is unchanged; three Cypher MATCH cases (`mentions`, property-name, mixed list).
+  - `tests/test_diagnostics_wikilinks.py` (10): unresolved / ambiguous body wikilinks; unresolved frontmatter `[[]]`; silence on clean workspace; format strings; integration through `emit_resolver_warnings` and `maybe_emit_warnings`; the `diagnose_field` skip-wikilink pin.
+  - `tests/cli/test_query_cmd_wikilinks.py` (5): CLI `MATCH (a)-[:mentions]->(b)`, `MATCH (a)-[:primary]->(b)`, `--follow mentions`, `--diagnose` emits, no-`--diagnose` silence.
+  - `tests/conftest.py`: new `obsidian_vault_ws` fixture (8 packets: body wikilinks incl. alias / embed-skip / fragment, frontmatter `[[]]` scalar + mixed list, ambiguous basename `Strategy`, dangling `[[Ghost]]`, path-form `[[business/notes/Roadmap]]`).
+
+- **Workflow housekeeping:** archived prior STATUS body (task 0027) to `docs/changelog/0011.md`; flipped task 0029 to `done` with today's date (2026-05-17); added new "Phase: parser" row to `docs/roadmap.md`.
 
 ## Verification
 
-- `make format` — reformatted two test files (`test_cypher.py`, `test_cypher_set.py`) on first pass; rerun clean.
-- `make lint` — one E501 (line-too-long docstring in `test_set_backtick_binary_plus_concat`); shortened the docstring; rerun clean.
-- `make test` — `fmql` 636 passed (was 605; +31 from the new backtick tests across three modules including 10 parametrized parse-error cases), `fmql-semantic` 56 passed.
+- `make format` — reformatted three files (`edges.py`, `diagnostics.py`, `test_diagnostics_wikilinks.py`) on first pass; rerun clean.
+- `make lint` — clean first run (ruff + black --check).
+- `make test` — `fmql` 681 passed (was 605; +76 from the new wikilink tests across four modules), `fmql-semantic` 56 passed.
 
 ## Notes
 
-- **`?field_name` inline alias is load-bearing.** `?rule` in Lark inlines a rule when it has a single child. Both branches of `field_name: IDENT | BACKTICK_IDENT` always produce exactly one child, so the inlining always fires — meaning the transformer never sees a `field_name` Tree node, just the raw token. If anyone later removes the `?` for an unrelated reason (e.g. to add a `field_name(self, children)` method), `qualified_ident`'s child list will sprout a Tree where it expects a Token and `_is_field_or_ident` will silently filter it out, which would surface as a quiet "missing field" bug. Pinned by the parser-identity tests but worth knowing.
-- **`partition(".")` handles backticks-with-dots-in-name correctly because the var slot can never contain a dot.** Grammar `qualified_ident: IDENT ("." field_name)?` puts a bare `IDENT` (which is `[A-Za-z_][A-Za-z0-9_]*`, no dots) on the left of the dot; `_ident_value` strips backticks before `qualified_ident` joins on `.`; downstream `set_item` / `remove_clause` / `ve_ref` / `order_ref_qual` partition on the *first* `.`. So `t.\`a.b.c\`` round-trips correctly to var=`t`, field=`a.b.c`. Pinned by `test_exec_backtick_field_with_dots_in_name`. If anyone ever loosens the var slot to allow dots (e.g. for nested-namespace pattern vars) this invariant breaks silently — flag it in code review.
-- **Disallowed-position parse errors are Lark's stock `UnexpectedCharacters`.** The task spec asked for a hint message ("backticks are only valid for field names after a dot") but custom translation requires regex-matching Lark's error string, which is brittle. The 10-entry parametrize block pins that an error is raised but does not assert on the message text — message readability is "good enough for v1," to be revisited only if user reports show people getting confused.
-- **`_ident_value` uses `tok.type == "BACKTICK_IDENT"` rather than `s.startswith("\`") and s.endswith("\`")`.** First draft used three string predicates (`len(s) >= 2 and startswith and endswith`); /simplify review caught that the token tag already encodes the answer, so the rewrite is one branch on a pre-computed integer-comparable attribute instead of three string-length-dependent ops per parse. Same correctness, minimal hot-path overhead.
-- **Pseudo-field rejection survives backticks.** Both `` SET t.`_id` = "x" `` and `` REMOVE t.`_path` `` still fire `_reject_pseudo_write` (`executor.py:146`) because the unwrap happens at compile time before `executor.py` ever sees the field name as a string. Pinned with explicit tests in both `test_cypher_set.py` and `test_cypher_remove.py`.
+- **`MENTIONS_FIELD` lives in `wikilinks.py`, not `edges.py`.** The first cut put it in `edges.py` and `workspace.py` did a lazy in-method import to dodge a perceived cycle. The /simplify review caught both: (a) the cycle was only at type-check time (edges.py uses `if TYPE_CHECKING: from fmql.workspace import Workspace`), so a top-level import works fine at runtime; (b) since wikilinks.py is the leaf module that originates the concept, putting the constant there resolves the import-direction smell — every consumer imports from one place. ADR 0012's "constant lives in" line was updated accordingly.
+
+- **Two methods became one.** The plan had a `fused_reverse_index(field, resolver)` sitting alongside the original resolver-only `reverse_index(field, resolver)`. After implementing both and grepping for callers, only a cache-identity test reached `reverse_index` from outside the engine; that test only asserts `idx1 is idx2`, so the semantic change is invisible to it. Collapsing to one method drops the dead dual-surface — CLAUDE.md's "no backwards-compatibility hacks" principle covers this even at pre-1.0.
+
+- **`mentions` is a reserved field name in the engine's vocabulary, with union semantics.** A user who has `mentions: ["task-1"]` in frontmatter AND body `[[task-1]]` gets one edge, not two (per-call `seen` set in `iter_forward_targets`; per-target dedup in `reverse_index`). Documented in the README and pinned by the `obsidian_vault_ws`-driven tests. The future `WORKSPACE.md body_link_edge_type` config (out of scope per task) is a one-line swap from the module constant to a workspace-config read.
+
+- **Single quotes are not valid Cypher string delimiters in fmql.** Initial tests used `WHERE a.id = 'Index.md'` and failed at the parser ("No terminal matches ''' in the current parser context"). The grammar accepts `ESCAPED_STRING` (double quotes) only. Fixed the four affected tests + the README example. This is consistent with Cypher's own preference, not a divergence — worth noting because Cypher elsewhere often shows examples with single quotes.
+
+- **`a.id` vs `a._id`.** Same fix pass: the pseudo-field is underscore-prefixed (`_id` / `_path`) per ADR 0003 — `a.id` resolves to the `id` frontmatter key, which most packets in the new fixture don't carry, so `WHERE a.id = "..."` matched nothing. README and tests now use `a._id`. The README's other examples were already correct; only the new wikilinks section needed the fix.
+
+- **`diagnose_field` short-circuit is load-bearing.** Without it, the existing `--diagnose` plumbing would re-flag every `[[Strategy]]` as an unresolved value against the bound resolver, producing duplicate-and-misleading warnings alongside the new `WikilinkDiagnostic` lines. The one-line `if match_whole_value_wikilink(item) is not None: continue` is the entire fix; pinned by `test_wikilink_items_skipped_in_field_diagnose` in `test_diagnostics_wikilinks.py`.
+
+- **Out of scope per task and ADR 0012:** `![[…]]` embeds (skipped at regex level via negative lookbehind), `#heading` / `^block-id` fragment edges (resolved to file only), configurable body-link edge type via `WORKSPACE.md`, lazy body parsing (eager is the v1 choice; performance follow-up if 10k-vault profiling shows it matters).

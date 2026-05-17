@@ -175,3 +175,42 @@ def paths_refs_ws(make_workspace) -> Workspace:
         },
     }
     return make_workspace(spec)
+
+
+@pytest.fixture
+def obsidian_vault_ws(make_workspace) -> Workspace:
+    """Obsidian-shaped fixture exercising both wikilink edge sources.
+
+    - Body wikilinks (single, multiple, alias, embedded skipped, heading-fragment).
+    - Frontmatter ``[[]]`` values in scalar and list form.
+    - Mixed list (``[[]]`` and bare-string item under default resolver).
+    - Ambiguous basename (two ``Strategy`` notes).
+    - Dangling ``[[Ghost]]`` link.
+    - Path-form ``[[business/notes/Roadmap]]``.
+    """
+    spec: dict[str, Any] = {
+        "Strategy.md": {"frontmatter": None, "body": "top-level strategy\n"},
+        "alt/Strategy.md": {"frontmatter": None, "body": "alternate strategy\n"},
+        "business/notes/Roadmap.md": {"frontmatter": None, "body": "roadmap\n"},
+        "Playbook.md": {"frontmatter": None, "body": "playbook\n"},
+        "Index.md": {
+            "frontmatter": None,
+            "body": (
+                "# Index\n\n"
+                "see [[Strategy]] and [[Playbook|the playbook]]\n"
+                "drilldown: [[business/notes/Roadmap]]\n"
+                "fragment ref: [[Strategy#vision]]\n"
+                "image: ![[Diagram.png]]\n"
+                "ghost ref: [[Ghost]]\n"
+            ),
+        },
+        "ScalarRef.md": {
+            "frontmatter": {"primary": "[[Playbook]]"},
+            "body": "scalar wikilink in frontmatter\n",
+        },
+        "ListRef.md": {
+            "frontmatter": {"related": ["[[Playbook]]", "Strategy.md"]},
+            "body": "mixed list — wikilink and bare path\n",
+        },
+    }
+    return make_workspace(spec)

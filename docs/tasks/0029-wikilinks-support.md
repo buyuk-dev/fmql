@@ -1,10 +1,10 @@
 ---
 id: 0029
 title: Wikilink support — body parsing and frontmatter `[[]]` value recognition
-status: todo
+status: done
 priority: 1
 created: 2026-05-09
-updated: 2026-05-09
+updated: 2026-05-17
 tags: [parser, edges, obsidian, frontmatter, body]
 depends_on: []
 phase: parser

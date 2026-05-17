@@ -37,6 +37,7 @@ from fmql.cypher.expr import (
     packet_field,
     unknown_function_error,
 )
+from fmql.edges import iter_forward_targets
 from fmql.edits import EditOp, EditPlan
 from fmql.errors import CypherError
 from fmql.ordering import OrderKey, apply_order
@@ -269,19 +270,7 @@ def _reachable(workspace: Workspace, src: PacketId, rel: RelHop) -> set[PacketId
 def _neighbors(
     workspace: Workspace, pid: PacketId, field: str, resolver: Resolver
 ) -> list[PacketId]:
-    packet = workspace.packets.get(pid)
-    if packet is None:
-        return []
-    raw = packet.as_plain().get(field)
-    if raw is None:
-        return []
-    items = raw if isinstance(raw, (list, tuple)) else [raw]
-    out: list[PacketId] = []
-    for item in items:
-        tgt = resolver.resolve(item, origin=pid, workspace=workspace)
-        if tgt is not None:
-            out.append(tgt)
-    return out
+    return list(iter_forward_targets(workspace, pid, field, resolver))
 
 
 def _build_edit_plan(

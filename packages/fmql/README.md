@@ -395,6 +395,32 @@ Free-form notes here. The body is ignored by fmql; only the `fmql:` block in fro
 
 Precedence: `--resolver FLAG` (per-invocation) > Python `Workspace(resolvers=…, default_resolver=…)` kwargs > `WORKSPACE.md` > built-in `path` default. An unknown resolver name in `WORKSPACE.md` raises an error at workspace load time. `fmql.diagnose` must be a boolean — non-bool values raise an error.
 
+### Wikilinks (Obsidian compatibility)
+
+fmql recognises Obsidian's two wikilink shapes as graph edges directly — no resolver configuration required.
+
+- **Body wikilinks.** Every `[[Note Name]]` (or `[[Note Name|alias]]`) found in a packet's markdown body becomes an edge of type `mentions` to the resolved target. The alias is ignored for resolution; the target is the substring before `|`.
+- **Frontmatter `[[]]` values.** A frontmatter property whose value is wholly `[[X]]` (scalar or list item) becomes an edge typed by the property name, bypassing the configured resolver. Mixed lists work: `related: ["[[Strategy]]", "playbook.md"]` produces one wikilink edge for `Strategy` and one resolver-path edge for `playbook.md`.
+
+```bash
+# Body wikilinks query as `mentions` edges
+fmql query 'MATCH (a)-[:mentions]->(b) WHERE a._id = "Index.md" RETURN b' -w ./vault
+fmql query 'MATCH (n) WHERE n._id = "Index.md" RETURN n' -w ./vault --follow mentions --depth '*'
+
+# Frontmatter `[[]]` items typed by property name
+fmql query 'MATCH (a)-[:related]->(b) RETURN a, b' -w ./vault
+```
+
+Resolution rules:
+
+- `[[Note Name]]` matches a packet whose filename (without `.md`) equals `Note Name`. When two packets share a basename, fmql picks the alphabetically first packet id and emits a `--diagnose` warning listing the alternates.
+- `[[folder/Note Name]]` resolves as a workspace-relative path (`.md` is appended if absent).
+- `[[Note#heading]]` and `[[Note^block-id]]` resolve to the file; heading/block fragments are stripped (block-level edges are out of scope for v1).
+- Missing target: the edge is silently dropped; pass `--diagnose` to surface a stderr warning identifying the source packet and the raw link text.
+- Embedded wikilinks (`![[Diagram.png]]`) are render-the-content-here syntax and are not graph edges in v1.
+
+Shadowing: when a frontmatter item matches `[[X]]`, the wikilink path runs and the configured resolver is *not* called for that item. Combined with body wikilinks, this means: if your `mentions` frontmatter property has a `[[X]]` item and your body also links to the same packet, you still get one edge (per-call dedup), not two.
+
 For the whole reachability closure as structured graph data (not a row set), use `fmql subgraph`. It emits `{nodes, edges}` JSON by default (`--format raw`), or a Cytoscape.js-ready shape with `--format cytoscape`:
 
 ```bash
